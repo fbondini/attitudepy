@@ -2,44 +2,62 @@
 
 import numpy as np
 from matplotlib import pyplot as plt
-from matplotlib import style
 from scipy.integrate import odeint
 
-from attitudepy import AttitudeEuler, Spacecraft, dynamics_equation
-
-style.use("default.mplstyle")
-
-attitude = AttitudeEuler(
-    np.array([30, 30, 30]) * np.pi / 180,
+from assignment_data import initialise_euler
+from attitudepy import (
+    PDController,
+    dynamics_equation,
+    dynamics_equation_nogravtorque,
 )
+from eulangles_plotting import plot_eul, plot_eul_separate
 
-sc = Spacecraft(
-    initial_attitude=attitude,
-    orbit_alt=700,  # km
-    inertia=np.array([
-        [124.531,       0,     0],  # noqa: E241
-        [      0, 124.586,     0],  # noqa: E201, E241
-        [      0,       0, 0.704],  # noqa: E201, E241
-    ]),
-    torque_disturb=np.array([
-        0.001, 0.001, 0.001,  # Nm
-    ]),
-)
+# ###################################
+# # Main function options
+# ###################################
+
+no_control_no_gravity = True
+no_control = True
+classic_control = False
 
 t = np.arange(0, 1500, 0.1)
-y = odeint(dynamics_equation, sc.attitude.x0, t, (sc,))
 
-plt.figure()
+classic_kp = [20, 20, 1]
+classic_kd = [120, 120, 6.5]
 
-plt.plot(t, y[:, 0] * 180 / np.pi, label="$\\theta_1$")
-plt.plot(t, y[:, 1] * 180 / np.pi, label="$\\theta_2$")
-plt.plot(t, y[:, 2] * 180 / np.pi, label="$\\theta_3$")
 
-plt.grid(True)  # noqa: FBT003
-plt.legend(loc="best")
-plt.xlabel("Time (s)")
-plt.ylabel("Euler angles (deg)")
-plt.title("Attitude without control")
-plt.tight_layout()
+def reference_commands(t, x):  # noqa: ANN001, ANN201, D103
+    if t < 100:
+        return np.array([0, 0, 0, 0, 0, 0]) * np.pi / 180
 
-plt.show()
+    if (t >= 100) and (t <= 500):
+        return np.array([70, 70, 70, 0, 0, 0]) * np.pi / 180
+
+    if (t > 500) and (t <= 900):
+        return np.array([-70, -70, -70, 0, 0, 0]) * np.pi / 180
+
+    return np.array([0, 0, 0, 0, 0, 0]) * np.pi / 180
+
+# ###################################
+
+
+if no_control_no_gravity:
+    attitude, spacecraft = initialise_euler()
+
+    y = odeint(dynamics_equation_nogravtorque, spacecraft.attitude.x0, t, (spacecraft,))
+
+    plot_eul(t, y, ["$\\theta_1$", "$\\theta_2$", "$\\theta_3$"],
+                ["Time (s)", "Angles [deg]"], "No control, no gravity gradient torque")
+
+
+if no_control:
+    attitude, spacecraft = initialise_euler()
+
+    y = odeint(dynamics_equation, spacecraft.attitude.x0, t, (spacecraft,))
+
+    plot_eul(t, y, ["$\\theta_1$", "$\\theta_2$", "$\\theta_3$"],
+                ["Time (s)", "Angles [deg]"], "Non-controlled attitude")
+
+
+if np.any([no_control_no_gravity, no_control, classic_control]):
+    plt.show()
