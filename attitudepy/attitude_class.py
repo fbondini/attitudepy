@@ -1,6 +1,7 @@
 """Attitude class."""
 
 from abc import ABC, abstractmethod
+from typing import Tuple
 
 import numpy as np
 
@@ -57,6 +58,34 @@ class Attitude(ABC):
         -------
         ndarray
             Gravity gradient torque.
+        """
+        return
+
+    @abstractmethod
+    def state_error(self, current_ang: np.ndarray,
+                        current_w: np.ndarray, ref_ang: np.ndarray,
+                        ref_w: np.ndarray,
+                        n: float) -> Tuple[np.ndarray, np.ndarray]:
+        """Compute the error between reference and current state.
+
+        Parameters
+        ----------
+        current_ang : ndarray
+            Current attitude vector (e.g., Euler angles or quaternion).
+        current_w: np.ndarray
+            Current angular velocity in rad/s
+        ref_ang : ndarray
+            Reference attitude vector (e.g., Euler angles or quaternion).
+        ref_w: np.ndarray
+            Reference angular velocity in rad/s
+        n: float
+            Orbit mean motion in rad/s
+
+        Returns
+        -------
+        e, e_dot: ndarray, ndarray
+            Error and error derivative to be passed to the Controller u function.
+            .
         """
         return
 
@@ -165,6 +194,36 @@ class AttitudeEuler(Attitude):
         right_vector = np.array([-np.sin(eul[1]), np.sin(eul[0]) * np.cos(eul[1]), np.cos(eul[0]) * np.cos(eul[1])])  # noqa: E501
 
         return 3 * n**2 * left_matrix @ inertia @ right_vector
+
+    def state_error(self, current_ang: np.ndarray,
+                        current_w: np.ndarray, ref_ang: np.ndarray,
+                        ref_thetadot: np.ndarray,
+                        n: float) -> Tuple[np.ndarray, np.ndarray]:
+        """Compute the error between reference and current state.
+
+        Parameters
+        ----------
+        current_ang : ndarray
+            Current Euler angles.
+        current_w: np.ndarray
+            Current angular velocity in rad/s
+        ref_ang : ndarray
+            Reference Euler angles.
+        ref_thetadot: np.ndarray
+            Reference derivative of the euler angles rad/s
+        n: float
+            Orbit mean motion in rad/s
+
+        Returns
+        -------
+        e, e_dot: ndarray, ndarray
+            Error and error derivative to be passed to the Controller u function.
+            .
+        """
+        e = current_ang - ref_ang
+        e_dot = self.kinematic_diff_equation(current_ang, current_w, n) - ref_thetadot
+
+        return e, e_dot
 
 
 class AttitudeQuat(Attitude):

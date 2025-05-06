@@ -18,7 +18,7 @@ from eulangles_plotting import plot_eul, plot_eul_separate
 
 no_control_no_gravity = True
 no_control = True
-classic_control = False
+classic_control = True
 
 t = np.arange(0, 1500, 0.1)
 
@@ -57,6 +57,17 @@ if no_control:
 
     plot_eul(t, y, ["$\\theta_1$", "$\\theta_2$", "$\\theta_3$"],
                 ["Time (s)", "Angles [deg]"], "Non-controlled attitude")
+
+
+if classic_control:
+    attitude, spacecraft = initialise_euler()
+    controller = PDController(classic_kp, classic_kd, reference_commands)
+
+    y = odeint(dynamics_equation, spacecraft.attitude.x0, t, (spacecraft, controller))
+
+    plot_eul_separate(t, y, ["$\\theta_1$", "$\\theta_2$", "$\\theta_3$"],
+                ["Time (s)", "Angles [deg]"], "Non-controlled attitude",
+                reference_commands)
 
 
 if np.any([no_control_no_gravity, no_control, classic_control]):

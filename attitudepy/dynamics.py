@@ -1,13 +1,13 @@
 """Attitude dynamics functions."""
 import numpy as np
 
-from .controller import Control
+from .controller import Controller
 from .spacecraft_class import Spacecraft
 
 
 # FUTURE: refactor with control inside of spacecraft
 def dynamics_equation(x: np.ndarray, t: float,
-                            sc: Spacecraft, ctrl: Control = None) -> np.ndarray:
+                            sc: Spacecraft, ctrl: Controller = None) -> np.ndarray:
     """Define the dynamics differential equations.
 
     To be passed to the integrator to integrate the state.
@@ -21,8 +21,8 @@ def dynamics_equation(x: np.ndarray, t: float,
         or 7 for quats + w).
     sc: Spacecraft
         Spacecraft object.
-    ctrl: Control (optional)
-        Control object
+    ctrl: Controller (optional)
+        Controller object
 
     Returns
     -------
@@ -31,13 +31,13 @@ def dynamics_equation(x: np.ndarray, t: float,
     """
     xdot = dynamics_equation_nogravtorque(x, t, sc, ctrl)
     xdot[-3:] = xdot[-3:] + (np.linalg.inv(sc.inertia) @
-                sc.attitude.gravity_gradient_torque(x[0:-3], sc.mean_motion, sc.inertia))
+            sc.attitude.gravity_gradient_torque(x[0:-3], sc.mean_motion, sc.inertia))
 
     return xdot
 
 
 def dynamics_equation_nogravtorque(x: np.ndarray, t: float,
-                            sc: Spacecraft, ctrl: Control = None) -> np.ndarray:
+                            sc: Spacecraft, ctrl: Controller = None) -> np.ndarray:
     """Define the dynamics differential equations without gravity torque.
 
     To be passed to the integrator to integrate the state.
@@ -51,8 +51,8 @@ def dynamics_equation_nogravtorque(x: np.ndarray, t: float,
         or 7 for quats + w).
     sc: Spacecraft
         Spacecraft object.
-    ctrl: Control (optional)
-        Control object
+    ctrl: Controller (optional)
+        Controller object
 
     Returns
     -------
@@ -66,8 +66,13 @@ def dynamics_equation_nogravtorque(x: np.ndarray, t: float,
 
     fx_part = np.linalg.inv(sc.inertia) @ sc.attitude.s_matrix(w) @ sc.inertia @ w
 
-    # Torques acting on the spacecraft
-    u = ctrl.u if ctrl is not None else np.zeros(3)  # control + disturbances
+    # Control and disturbance torques
+    if ctrl is not None:
+        ref = ctrl.guidance(t, x)
+        e, e_dot = sc.attitude.state_error(ang, w, ref[:-3], ref[-3:], sc.mean_motion)
+        u = ctrl.u(e, e_dot) + sc.torque_disturb
+    else:
+        u = np.zeros(3)
 
     gu_part = np.linalg.inv(sc.inertia) @ u
 
