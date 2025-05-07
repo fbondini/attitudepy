@@ -1,11 +1,26 @@
 """Package init."""
 
-from .attitude_class import AttitudeEuler, AttitudeQuat
+from .attitude_class import (
+            AttitudeEuler,
+            AttitudeQuat,
+            to_euler,
+            to_euler_state,
+            to_quat,
+            to_quat_state,
+)
 from .controller import PDController
 from .dynamics import dynamics_equation, dynamics_equation_nogravtorque
 from .spacecraft_class import Spacecraft
 
-__all__ = ["AttitudeEuler", "AttitudeQuat",
+__all__ = [
+            "AttitudeEuler",
+            "AttitudeQuat",
             "PDController",
             "Spacecraft",
-            "dynamics_equation", "dynamics_equation_nogravtorque"]
+            "dynamics_equation",
+            "dynamics_equation_nogravtorque",
+            "to_euler",
+            "to_euler_state",
+            "to_quat",
+            "to_quat_state",
+]

@@ -4,26 +4,37 @@ import numpy as np
 from matplotlib import pyplot as plt
 from scipy.integrate import odeint
 
-from assignment_data import initialise_euler
+from assignment_data import initialise_euler, initialise_quat
 from attitudepy import (
+    AttitudeEuler,
+    AttitudeQuat,
     PDController,
+    Spacecraft,
     dynamics_equation,
     dynamics_equation_nogravtorque,
+    to_quat_state,
 )
-from eulangles_plotting import plot_eul, plot_eul_separate
+from plotting_utils import plot_eul, plot_eul_separate, plot_quat, plot_quat_separate
 
 # ###################################
 # # Main function options
 # ###################################
 
-no_control_no_gravity = True
-no_control = True
-classic_control = True
+eul_no_control_no_gravity = False
+eul_no_control = False
+eul_classic_control = False
+
+quat_no_control_no_gravity = False
+quat_no_control = False
+quat_classic_control = True
 
 t = np.arange(0, 1500, 0.1)
 
 classic_kp = [20, 20, 1]
 classic_kd = [120, 120, 6.5]
+
+classic_kp_quat = [20, 20, 1, 0]
+classic_kd_quat = [120, 120, 6.5]
 
 
 def reference_commands(t, x):  # noqa: ANN001, ANN201, D103
@@ -38,37 +49,109 @@ def reference_commands(t, x):  # noqa: ANN001, ANN201, D103
 
     return np.array([0, 0, 0, 0, 0, 0]) * np.pi / 180
 
+
+def reference_commands_quat(t, x):  # noqa: ANN001, ANN201, D103
+    return to_quat_state(reference_commands(t, x))
+
 # ###################################
 
 
-if no_control_no_gravity:
-    attitude, spacecraft = initialise_euler()
+if eul_no_control_no_gravity:
+    attitude = AttitudeEuler(
+            np.array([0, 0, 0]) * np.pi / 180,
+        )
+
+    spacecraft = Spacecraft(
+        initial_attitude=attitude,
+        orbit_alt=700,  # km
+        inertia=np.array([
+            [124.531,       0,     0],  # noqa: E241
+            [      0, 124.586,     0],  # noqa: E201, E241
+            [      0,       0, 0.704],  # noqa: E201, E241
+        ]),
+        torque_disturb=np.array([
+            0.001, 0.001, 0.001,  # Nm
+        ]),
+    )
 
     y = odeint(dynamics_equation_nogravtorque, spacecraft.attitude.x0, t, (spacecraft,))
 
     plot_eul(t, y, ["$\\theta_1$", "$\\theta_2$", "$\\theta_3$"],
-                ["Time (s)", "Angles [deg]"], "No control, no gravity gradient torque")
+                ["Time (s)", "Angles [deg]"], "No control, no gravity gradient torque - E")  # noqa: E501
 
 
-if no_control:
+if eul_no_control:
     attitude, spacecraft = initialise_euler()
 
     y = odeint(dynamics_equation, spacecraft.attitude.x0, t, (spacecraft,))
 
     plot_eul(t, y, ["$\\theta_1$", "$\\theta_2$", "$\\theta_3$"],
-                ["Time (s)", "Angles [deg]"], "Non-controlled attitude")
+                ["Time (s)", "Angles [deg]"], "Non-controlled attitude - E")
 
 
-if classic_control:
+if eul_classic_control:
     attitude, spacecraft = initialise_euler()
     controller = PDController(classic_kp, classic_kd, reference_commands)
 
     y = odeint(dynamics_equation, spacecraft.attitude.x0, t, (spacecraft, controller))
 
     plot_eul_separate(t, y, ["$\\theta_1$", "$\\theta_2$", "$\\theta_3$"],
-                ["Time (s)", "Angles [deg]"], "Non-controlled attitude",
+                ["Time (s)", "Angles [deg]"], "Classically controlled attitude - E",
                 reference_commands)
 
 
-if np.any([no_control_no_gravity, no_control, classic_control]):
+if quat_no_control_no_gravity:
+    attitude = AttitudeQuat(
+            np.array([0, 0, 0, 1]),
+        )
+
+    spacecraft = Spacecraft(
+        initial_attitude=attitude,
+        orbit_alt=700,  # km
+        inertia=np.array([
+            [124.531,       0,     0],  # noqa: E241
+            [      0, 124.586,     0],  # noqa: E201, E241
+            [      0,       0, 0.704],  # noqa: E201, E241
+        ]),
+        torque_disturb=np.array([
+            0.001, 0.001, 0.001,  # Nm
+        ]),
+    )
+
+    y = odeint(dynamics_equation_nogravtorque, spacecraft.attitude.x0, t, (spacecraft,))
+
+    plot_quat(t, y, ["$\\theta_1$", "$\\theta_2$", "$\\theta_3$"],
+                ["Time (s)", "Angles [deg]"], "No control, no gravity gradient torque - Q")  # noqa: E501
+
+
+if quat_no_control:
+    attitude, spacecraft = initialise_quat()
+
+    y = odeint(dynamics_equation, spacecraft.attitude.x0, t, (spacecraft,))
+
+    plot_quat(t, y, ["$\\theta_1$", "$\\theta_2$", "$\\theta_3$"],
+                ["Time (s)", "Angles [deg]"], "Non-controlled attitude - Q")
+
+
+if quat_classic_control:
+    attitude, spacecraft = initialise_quat()
+    controller = PDController(classic_kp_quat, classic_kd_quat, reference_commands_quat)
+
+    y = odeint(dynamics_equation, spacecraft.attitude.x0, t, (spacecraft, controller))
+    for i in range(len(y)):
+        y[i, :4] /= np.linalg.norm(y[i, :4])
+
+    plot_quat_separate(t, y, ["$\\theta_1$", "$\\theta_2$", "$\\theta_3$"],
+                ["Time (s)", "Angles [deg]"], "Classically controlled attitude - Q",
+                reference_commands)
+
+
+if np.any([
+        eul_no_control_no_gravity,
+        eul_no_control,
+        eul_classic_control,
+        quat_no_control_no_gravity,
+        quat_no_control,
+        quat_classic_control,
+]):
     plt.show()

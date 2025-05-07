@@ -87,4 +87,4 @@ class PDController(Controller):
         float | ndarray
             Control command.
         """
-        return -(e * self.kp + e_dot * self.kd)
+        return -((e * self.kp)[:3] + (e_dot * self.kd)[:3])  # with quaternions it only takes the first 3 components  # noqa: E501

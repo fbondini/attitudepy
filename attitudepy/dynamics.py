@@ -62,6 +62,9 @@ def dynamics_equation_nogravtorque(x: np.ndarray, t: float,
     ang = x[0:-3]
     w = x[-3:]
 
+    if len(ang) == 4:
+        ang = ang / np.linalg.norm(ang)
+
     angdot = sc.attitude.kinematic_diff_equation(ang, w, sc.mean_motion)
 
     fx_part = np.linalg.inv(sc.inertia) @ sc.attitude.s_matrix(w) @ sc.inertia @ w
