@@ -9,15 +9,20 @@ from .attitude_class import (
             to_quat_state,
 )
 from .controller import Controller, PDController
-from .dynamics import DynamicsSimulator, DynamicsSimulatorNoGravTorque
+from .dynamics import (
+            ABCDynamicsSimulator,
+            DynamicsSimulator,
+            DynamicsSimulatorNoGravityTorque,
+)
 from .spacecraft_class import Spacecraft
 
 __all__ = [
+            "ABCDynamicsSimulator",
             "AttitudeEuler",
             "AttitudeQuat",
             "Controller",
             "DynamicsSimulator",
-            "DynamicsSimulatorNoGravTorque",
+            "DynamicsSimulatorNoGravityTorque",
             "PDController",
             "Spacecraft",
             "to_euler",

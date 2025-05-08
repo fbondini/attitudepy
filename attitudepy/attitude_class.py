@@ -27,16 +27,11 @@ class Attitude(ABC):
         self.ang = None
         self.w = None
 
-    def kinematic_diff_equation(self, ang: np.ndarray, w: np.ndarray,
-                                    n: float) -> np.ndarray:
+    def kinematic_diff_equation(self, n: float) -> np.ndarray:
         """Compute the kinematic differential equation for attitude.
 
         Parameters
         ----------
-        ang : ndarray
-            Attitude vector (e.g., Euler angles or quaternion).
-        w: np.ndarray
-            Angular velocity in rad/s
         n: float
             Orbit mean motion
 
@@ -45,21 +40,22 @@ class Attitude(ABC):
         ndarray
             Time derivative of the attitude vector.
         """
-        c2 = self.c_matrix(ang)[:, 1]
+        ang = self.ang
+        w = self.w
+
+        c2 = self.c_matrix()[:, 1]
         if len(ang) == 4:
             w = np.append(w, 0)
             c2 = np.append(c2, 0)
 
-        return self.w2angdot_matrix(ang) @ (w + n * c2)
+        return self.w2angdot_matrix() @ (w + n * c2)
 
-    def gravity_gradient_torque(self, ang: np.ndarray, n: np.ndarray,
+    def gravity_gradient_torque(self, n: np.ndarray,
                                         inertia: np.ndarray) -> np.ndarray:
         """Compute the torque given by gravity gradient.
 
         Parameters
         ----------
-        ang : ndarray
-            Attitude vector (e.g., Euler angles or quaternion).
         n: np.ndarray
             Orbital mean motion in rad/s.
         inertia: np.ndarray
@@ -70,22 +66,16 @@ class Attitude(ABC):
         ndarray
             Gravity gradient torque.
         """
-        c3 = self.c_matrix(ang)[:, 2]
+        c3 = self.c_matrix()[:, 2]
         return np.cross(3 * n**2 * c3, inertia @ c3)
 
     @abstractmethod
-    def state_error(self, current_ang: np.ndarray,
-                        current_w: np.ndarray, ref_ang: np.ndarray,
-                        ref_w: np.ndarray,
+    def state_error(self, ref_ang: np.ndarray, ref_w: np.ndarray,
                         n: float) -> Tuple[np.ndarray, np.ndarray]:
         """Compute the error between reference and current state.
 
         Parameters
         ----------
-        current_ang : ndarray
-            Current attitude vector (e.g., Euler angles or quaternion).
-        current_w: np.ndarray
-            Current angular velocity in rad/s
         ref_ang : ndarray
             Reference attitude vector (e.g., Euler angles or quaternion).
         ref_w: np.ndarray
@@ -101,35 +91,24 @@ class Attitude(ABC):
         """
         return
 
-    @staticmethod
-    def s_matrix(w: np.ndarray) -> np.ndarray:
+    def s_matrix(self) -> np.ndarray:
         """S(w) matrix to transform cross product to matrix product.
-
-        Parameters
-        ----------
-        w: np.ndarray
-            Angular velocity (rad/s)
 
         Returns
         -------
         np.ndarray
             S matrix.
         """
+        w = self.w
         return np.array([
             [    0,  w[2], -w[1]],  # noqa: E201, E241
             [-w[2],     0,  w[0]],  # noqa: E241
             [ w[1], -w[0],     0],  # noqa: E201, E241
         ])
 
-    @staticmethod
     @abstractmethod
-    def c_matrix(ang: np.ndarray) -> np.ndarray:
+    def c_matrix(self) -> np.ndarray:
         """C(ang) matrix to express rotations of attitude angles.
-
-        Parameters
-        ----------
-        ang: ndarray
-            Attitude (either euler or quaternions)
 
         Returns
         -------
@@ -138,15 +117,9 @@ class Attitude(ABC):
         """
         return
 
-    @staticmethod
     @abstractmethod
-    def w2angdot_matrix(ang: np.ndarray) -> np.ndarray:
+    def w2angdot_matrix(self) -> np.ndarray:
         """Matrix to transform from angular velocity to attitude derivative.
-
-        Parameters
-        ----------
-        ang: ndarray
-            Attitude (either Euler or quaternions)
 
         Returns
         -------
@@ -188,18 +161,13 @@ class AttitudeEuler(Attitude):
         self.w = np.array([0, 0, 0])
         self.x0 = np.append(self.ang, self.w)
 
-    def state_error(self, current_ang: np.ndarray,
-                        current_w: np.ndarray, ref_ang: np.ndarray,
+    def state_error(self, ref_ang: np.ndarray,
                         ref_thetadot: np.ndarray,
                         n: float) -> Tuple[np.ndarray, np.ndarray]:
         """Compute the error between reference and current state.
 
         Parameters
         ----------
-        current_ang : ndarray
-            Current Euler angles.
-        current_w: np.ndarray
-            Current angular velocity in rad/s
         ref_ang : ndarray
             Reference Euler angles.
         ref_thetadot: np.ndarray
@@ -213,45 +181,35 @@ class AttitudeEuler(Attitude):
             Error and error derivative to be passed to the Controller u function.
             .
         """
-        e = current_ang - ref_ang
-        e_dot = self.kinematic_diff_equation(current_ang, current_w, n) - ref_thetadot
+        e = self.ang - ref_ang
+        e_dot = self.kinematic_diff_equation(n) - ref_thetadot
 
         return e, e_dot
 
-    @staticmethod
-    def c_matrix(eul: np.ndarray) -> np.ndarray:
+    def c_matrix(self) -> np.ndarray:
         """C(ang) matrix to express rotations of attitude angles.
-
-        Parameters
-        ----------
-        eul: ndarray
-            Euler angles
 
         Returns
         -------
         ndarray
             C matrix.
         """
+        eul = self.ang
         return np.array([
             [np.cos(eul[1]) * np.cos(eul[2]), np.cos(eul[1]) * np.sin(eul[2]), -np.sin(eul[1])],  # noqa: E501
             [np.cos(eul[2]) * np.sin(eul[0]) * np.sin(eul[1]) - np.cos(eul[0]) * np.sin(eul[2]), np.cos(eul[0]) * np.cos(eul[2]) + np.sin(eul[0]) * np.sin(eul[1]) * np.sin(eul[2]), np.cos(eul[1]) * np.sin(eul[0])],  # noqa: E501
             [np.sin(eul[0]) * np.sin(eul[2]) + np.cos(eul[0]) * np.cos(eul[2]) * np.sin(eul[1]), np.cos(eul[0]) * np.sin(eul[1]) * np.sin(eul[2]) - np.cos(eul[2]) * np.sin(eul[0]), np.cos(eul[0]) * np.cos(eul[1])],  # noqa: E501
         ])
 
-    @staticmethod
-    def w2angdot_matrix(eul: np.ndarray) -> np.ndarray:
+    def w2angdot_matrix(self) -> np.ndarray:
         """Matrix to transform from angular velocity to euler angle derivative.
-
-        Parameters
-        ----------
-        eul: ndarray
-            Euler angles
 
         Returns
         -------
         ndarray
             Angular velocity -> euler derivative, matrix.
         """
+        eul = self.ang
         return 1 / (np.cos(eul[1])) * np.array([
                             [np.cos(eul[1]), np.sin(eul[0]) * np.sin(eul[1]),  np.cos(eul[0]) * np.sin(eul[1])],  # noqa: E241, E501
                             [             0, np.cos(eul[0]) * np.cos(eul[1]), -np.sin(eul[0]) * np.cos(eul[1])],  # noqa: E201, E501
@@ -300,38 +258,28 @@ class AttitudeQuat(Attitude):
         self.w = np.array([0, 0, 0])
         self.x0 = np.append(self.ang, self.w)
 
-    @staticmethod
-    def c_matrix(q: np.ndarray) -> np.ndarray:
+    def c_matrix(self) -> np.ndarray:
         """C(ang) matrix to express rotations of attitude angles.
-
-        Parameters
-        ----------
-        q: ndarray
-            quaternions
 
         Returns
         -------
         ndarray
             C matrix.
         """
+        q = self.ang
         return np.array([
             [    1 - 2 * (q[1]**2 + q[2]**2), 2 * (q[0] * q[1] + q[2] * q[3]), 2 * (q[0] * q[2] - q[1] * q[3])],  # noqa: E201, E501
             [2 * (q[0] * q[1] - q[2] * q[3]),     1 - 2 * (q[0]**2 + q[2]**2), 2 * (q[1] * q[2] + q[0] * q[3])],  # noqa: E241, E501
             [2 * (q[0] * q[2] + q[1] * q[3]), 2 * (q[1] * q[2] - q[0] * q[3]),     1 - 2 * (q[0]**2 + q[1]**2)],  # noqa: E241, E501
         ])
 
-    def state_error(self, current_ang: np.ndarray,
-                        current_w: np.ndarray, ref_ang: np.ndarray,
+    def state_error(self, ref_ang: np.ndarray,
                         ref_w: np.ndarray,
                         n: float) -> Tuple[np.ndarray, np.ndarray]:
         """Compute the error between reference and current state.
 
         Parameters
         ----------
-        current_ang : ndarray
-            Current quaternions.
-        current_w: np.ndarray
-            Current angular velocity in rad/s
         ref_ang : ndarray
             Reference quaternions.
         ref_w: np.ndarray
@@ -345,6 +293,8 @@ class AttitudeQuat(Attitude):
             Error and error derivative to be passed to the Controller u function.
             .
         """
+        current_ang = self.ang
+        current_w = self.w
         e = self._q_rot_matrix(ref_ang) @ current_ang
         e_dot = current_w - ref_w
 
@@ -359,19 +309,15 @@ class AttitudeQuat(Attitude):
             [q[0], q[1], q[2], q[3]],
         ])
 
-    def w2angdot_matrix(self, q: np.ndarray) -> np.ndarray:
+    def w2angdot_matrix(self) -> np.ndarray:
         """Matrix to transform from angular velocity to quaternion derivative.
-
-        Parameters
-        ----------
-        q: ndarray
-            Quaternions
 
         Returns
         -------
         ndarray
             Angular velocity -> quaternions, matrix.
         """
+        q = self.ang
         return 0.5 * self._q_rot_matrix(q).T
 
     def to_euler(self) -> AttitudeEuler:

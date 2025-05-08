@@ -7,7 +7,7 @@ from assignment_data import initialise_euler, initialise_quat
 from attitudepy import (
     AttitudeEuler,
     AttitudeQuat,
-    DynamicsSimulatorNoGravTorque,
+    DynamicsSimulatorNoGravityTorque,
     PDController,
     Spacecraft,
     to_quat_state,
@@ -72,7 +72,7 @@ if eul_no_control_no_gravity:
         ]),
     )
 
-    dynamics_simulator = DynamicsSimulatorNoGravTorque(spacecraft)
+    dynamics_simulator = DynamicsSimulatorNoGravityTorque(spacecraft)
     y = dynamics_simulator.simulate(t)
 
     plot_eul(t, y, ["$\\theta_1$", "$\\theta_2$", "$\\theta_3$"],
@@ -116,7 +116,7 @@ if quat_no_control_no_gravity:
         ]),
     )
 
-    dynamics_simulator = DynamicsSimulatorNoGravTorque(spacecraft)
+    dynamics_simulator = DynamicsSimulatorNoGravityTorque(spacecraft)
     y = dynamics_simulator.simulate(t)
 
     plot_quat(t, y, ["$\\theta_1$", "$\\theta_2$", "$\\theta_3$"],
