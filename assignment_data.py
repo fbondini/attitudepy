@@ -1,17 +1,17 @@
 """Initialise assignment data."""
-from typing import Tuple
-
 import numpy as np
 
 from attitudepy import (
     AttitudeEuler,
     AttitudeQuat,
+    Controller,
+    DynamicsSimulator,
     Spacecraft,
     to_quat,
 )
 
 
-def initialise_euler() -> Tuple[AttitudeEuler, Spacecraft]:
+def initialise_euler(controller: Controller = None) -> DynamicsSimulator:
     """Initialise attitude and spacecraft with the assignment data."""  # noqa: DOC201
     attitude = AttitudeEuler(
             np.array([30, 30, 30]) * np.pi / 180,
@@ -30,10 +30,10 @@ def initialise_euler() -> Tuple[AttitudeEuler, Spacecraft]:
         ]),
     )
 
-    return attitude, spacecraft
+    return DynamicsSimulator(spacecraft, controller)
 
 
-def initialise_quat() -> Tuple[AttitudeEuler, Spacecraft]:
+def initialise_quat(controller: Controller = None) -> DynamicsSimulator:
     """Initialise attitude and spacecraft with the assignment data."""  # noqa: DOC201
     attitude = AttitudeQuat(
             to_quat(np.array([30, 30, 30]) * np.pi / 180),
@@ -52,4 +52,4 @@ def initialise_quat() -> Tuple[AttitudeEuler, Spacecraft]:
         ]),
     )
 
-    return attitude, spacecraft
+    return DynamicsSimulator(spacecraft, controller)

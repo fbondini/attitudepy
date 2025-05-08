@@ -8,17 +8,18 @@ from .attitude_class import (
             to_quat,
             to_quat_state,
 )
-from .controller import PDController
-from .dynamics import dynamics_equation, dynamics_equation_nogravtorque
+from .controller import Controller, PDController
+from .dynamics import DynamicsSimulator, DynamicsSimulatorNoGravTorque
 from .spacecraft_class import Spacecraft
 
 __all__ = [
             "AttitudeEuler",
             "AttitudeQuat",
+            "Controller",
+            "DynamicsSimulator",
+            "DynamicsSimulatorNoGravTorque",
             "PDController",
             "Spacecraft",
-            "dynamics_equation",
-            "dynamics_equation_nogravtorque",
             "to_euler",
             "to_euler_state",
             "to_quat",

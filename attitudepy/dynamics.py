@@ -1,39 +1,115 @@
 """Attitude dynamics functions."""
 import numpy as np
+from scipy.integrate import odeint
 
 from .controller import Controller
 from .spacecraft_class import Spacecraft
 
 
-# FUTURE: refactor with control inside of spacecraft
-def dynamics_equation(x: np.ndarray, t: float,
+class DynamicsSimulatorNoGravTorque:
+    """Class defining dynamical equations and integration with no gravity torque."""
+
+    def __init__(self, spacecraft: Spacecraft, control: Controller = None) -> None:
+        """Initialise the dynamics simulator.
+
+        Parameters
+        ----------
+        spacecraft: Spacecraft
+            Spacecraft object
+        control: Controller (optional)
+            Controller object
+        """
+        self.spacecraft = spacecraft
+        self.control = control
+
+    def simulate(self, tvect: np.ndarray) -> np.ndarray:
+        """Integrates the dynamical equations at the provided timesteps.
+
+        Parameters
+        ----------
+        tvect: ndarray
+            Vector of times at which the dynamics must be integrated.
+
+        Returns
+        -------
+        ndarray
+            y output of scipy.integrate.odeint
+        """
+        return odeint(self.dynamics_equation, self.spacecraft.attitude.x0,
+                            tvect, (self.spacecraft, self.control))
+
+    @staticmethod
+    def dynamics_equation(x: np.ndarray, t: float,
                             sc: Spacecraft, ctrl: Controller = None) -> np.ndarray:
-    """Define the dynamics differential equations.
+        """Define the dynamics differential equations without gravity torque.
 
-    To be passed to the integrator to integrate the state.
+        To be passed to the integrator to integrate the state.
 
-    Parameters
-    ----------
-    t: float
-        Time (s).
-    x: np.ndarray
-        Current attitude state (either 6 components for eul angles + w,
-        or 7 for quats + w).
-    sc: Spacecraft
-        Spacecraft object.
-    ctrl: Controller (optional)
-        Controller object
+        Parameters
+        ----------
+        t: float
+            Time (s).
+        x: np.ndarray
+            Current attitude state (either 6 components for eul angles + w,
+            or 7 for quats + w).
+        sc: Spacecraft
+            Spacecraft object.
+        ctrl: Controller (optional)
+            Controller object
 
-    Returns
-    -------
-    xdot: float
-        Attitude state derivative.
-    """
-    xdot = dynamics_equation_nogravtorque(x, t, sc, ctrl)
-    xdot[-3:] = xdot[-3:] + (np.linalg.inv(sc.inertia) @
-            sc.attitude.gravity_gradient_torque(x[0:-3], sc.mean_motion, sc.inertia))
+        Returns
+        -------
+        xdot: float
+            Attitude state derivative.
+        """
+        return dynamics_equation_nogravtorque(x, t, sc, ctrl)
 
-    return xdot
+
+class DynamicsSimulator(DynamicsSimulatorNoGravTorque):
+    """Class defining the standard dynamical equations and integration."""
+
+    def __init__(self, spacecraft: Spacecraft, control: Controller = None) -> None:
+        """Initialise the dynamics simulator.
+
+        Parameters
+        ----------
+        spacecraft: Spacecraft
+            Spacecraft object
+        control: Controller (optional)
+            Controller object
+        """
+        super().__init__(spacecraft, control)
+
+    @staticmethod
+    def dynamics_equation(x: np.ndarray, t: float,
+                                sc: Spacecraft, ctrl: Controller = None) -> np.ndarray:
+        """Define the dynamics differential equations.
+
+        To be passed to the integrator to integrate the state.
+
+        Parameters
+        ----------
+        t: float
+            Time (s).
+        x: np.ndarray
+            Current attitude state (either 6 components for eul angles + w,
+            or 7 for quats + w).
+        sc: Spacecraft
+            Spacecraft object.
+        ctrl: Controller (optional)
+            Controller object
+
+        Returns
+        -------
+        xdot: float
+            Attitude state derivative.
+        """
+        xdot = dynamics_equation_nogravtorque(x, t, sc, ctrl)
+        xdot[-3:] = xdot[-3:] + (np.linalg.inv(sc.inertia) @
+                sc.attitude.gravity_gradient_torque(x[0:-3], sc.mean_motion,
+                                                        sc.inertia))
+
+        return xdot
 
 
 def dynamics_equation_nogravtorque(x: np.ndarray, t: float,
@@ -72,7 +148,8 @@ def dynamics_equation_nogravtorque(x: np.ndarray, t: float,
     # Control and disturbance torques
     if ctrl is not None:
         ref = ctrl.guidance(t, x)
-        e, e_dot = sc.attitude.state_error(ang, w, ref[:-3], ref[-3:], sc.mean_motion)
+        e, e_dot = sc.attitude.state_error(ang, w, ref[:-3], ref[-3:],
+                                                sc.mean_motion)
         u = ctrl.u(e, e_dot) + sc.torque_disturb
     else:
         u = np.zeros(3)
