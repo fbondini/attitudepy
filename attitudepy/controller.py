@@ -173,7 +173,7 @@ class PDController(Controller):
             return self.custom_control_command(dynamics_simulator, t)
 
         sc = dynamics_simulator.spacecraft
-        ref = self.guidance(t, np.append(sc.attitude.ang, sc.attitude.w))
+        ref = self.guidance(t, sc.attitude.x)
         e, e_dot = sc.attitude.state_error(ref[:-3], ref[-3:], sc.mean_motion)
 
         # with quaternions it only takes the first 3 components

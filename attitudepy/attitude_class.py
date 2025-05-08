@@ -159,7 +159,7 @@ class AttitudeEuler(Attitude):
 
         self.ang = initial_eul_angles
         self.w = np.array([0, 0, 0])
-        self.x0 = np.append(self.ang, self.w)
+        self.x = np.append(self.ang, self.w)
 
     def state_error(self, ref_ang: np.ndarray,
                         ref_thetadot: np.ndarray,
@@ -256,7 +256,7 @@ class AttitudeQuat(Attitude):
 
         self.ang = initial_quat
         self.w = np.array([0, 0, 0])
-        self.x0 = np.append(self.ang, self.w)
+        self.x = np.append(self.ang, self.w)
 
     def c_matrix(self) -> np.ndarray:
         """C(ang) matrix to express rotations of attitude angles.
