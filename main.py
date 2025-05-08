@@ -31,7 +31,7 @@ t = np.arange(0, 1500, 0.1)
 classic_kp = [20, 20, 1]
 classic_kd = [120, 120, 6.5]
 
-classic_kp_quat = [500, 500, 20, 0]
+classic_kp_quat = [500, 500, 20]
 classic_kd_quat = [300, 300, 10]
 
 

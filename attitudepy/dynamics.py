@@ -187,14 +187,7 @@ def dynamics_equation_nogravtorque(x: np.ndarray, t: float,
     fx_part = np.linalg.inv(sc.inertia) @ sc.attitude.s_matrix() @ sc.inertia \
                                                     @ sc.attitude.w
 
-    # Control and disturbance torques
-    if ctrl is not None:
-        ref = ctrl.guidance(t, x)
-        e, e_dot = sc.attitude.state_error(ref[:-3], ref[-3:],
-                                                sc.mean_motion)
-        u = ctrl.u(e, e_dot) + sc.torque_disturb
-    else:
-        u = np.zeros(3)
+    u = ctrl.full_control_command(dynamics_simulator, t) if ctrl is not None else np.zeros(3)  # noqa: E501
 
     gu_part = np.linalg.inv(sc.inertia) @ u
 
