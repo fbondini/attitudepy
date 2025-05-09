@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Callable, Optional, Tuple, Union
-
-import numpy as np
+from typing import TYPE_CHECKING, Callable, Optional, Union
 
 if TYPE_CHECKING:
+    import numpy as np
     from dynamics import ABCDynamicsSimulator
 
 
@@ -35,8 +34,9 @@ class Controller(ABC):  # noqa: D101
         self.following = following
         self.custom_control_command = custom_control_command
 
-    def full_control_command(self, dynamics_simulator: ABCDynamicsSimulator,
-                                t: float) -> Union[float, np.ndarray]:
+    def full_control_command(self, dynamics_simulator: ABCDynamicsSimulator, t: float,
+                        previous_control_command: Union[float, np.ndarray] = None,
+                        ) -> Union[float, np.ndarray]:
         """Compute the full control command given the state of the dynamics simulator.
 
         If there is a .following controller, the output control command will be the
@@ -49,6 +49,8 @@ class Controller(ABC):  # noqa: D101
             Dynamic simulator object
         t: float
             Current time
+        previous_control_command: float | ndarray
+            Control command computed by the previous block.
 
         Returns
         -------
@@ -56,11 +58,14 @@ class Controller(ABC):  # noqa: D101
             Control command.
         """
         if self.following is None:
-            return self.control_command(dynamics_simulator, t)
-        return self.following.full_control_command(dynamics_simulator, t)
+            return self.control_command(dynamics_simulator, t, previous_control_command)
+        return self.following.full_control_command(dynamics_simulator, t,
+                                            self.control_command(dynamics_simulator, t,
+                                                                previous_control_command))
 
-    def control_command(self, dynamics_simulator: ABCDynamicsSimulator,
-                                t: float) -> Union[float, np.ndarray]:
+    def control_command(self, dynamics_simulator: ABCDynamicsSimulator, t: float,
+                        previous_control_command: Union[float, np.ndarray] = None,
+                        ) -> Union[float, np.ndarray]:
         """Compute the control command given the current state of dynamics simulator.
 
         Parameters
@@ -69,6 +74,8 @@ class Controller(ABC):  # noqa: D101
             Dynamic simulator object
         t: float
             Current time
+        previous_control_command: float | ndarray
+            Control command computed by the previous block.
 
         Returns
         -------
@@ -76,12 +83,16 @@ class Controller(ABC):  # noqa: D101
             Control command.
         """
         if self.custom_control_command is not None:
-            return self.custom_control_command(dynamics_simulator, t)
-        return self._default_control_command(dynamics_simulator, t)
+            return self.custom_control_command(dynamics_simulator, t,
+                                                previous_control_command)
+        return self._default_control_command(dynamics_simulator, t,
+                                                previous_control_command)
 
     @abstractmethod
-    def _default_control_command(self, dynamics_simulator: ABCDynamicsSimulator,
-                                t: float) -> Union[float, np.ndarray]:
+    def _default_control_command(self,
+                        dynamics_simulator: ABCDynamicsSimulator, t: float,
+                        previous_control_command: Union[float, np.ndarray] = None,
+                        ) -> Union[float, np.ndarray]:
         """Set default control command given the current state of dynamics simulator.
 
         Parameters
@@ -90,19 +101,8 @@ class Controller(ABC):  # noqa: D101
             Dynamic simulator object
         t: float
             Current time
-
-        Returns
-        -------
-        float | ndarray
-            Control command.
-        """
-        return
-
-    @abstractmethod
-    def control_law(self, *params: Tuple) -> Union[float, np.ndarray]:
-        """Define the specific control law of the controller.
-
-        Given some parameters it outputs the control command.
+        previous_control_command: float | ndarray
+            Control command computed by the previous block.
 
         Returns
         -------
@@ -155,23 +155,26 @@ class PDController(Controller):
         self.kp = kp
         self.kd = kd
 
-    def _default_control_command(self, dynamics_simulator: ABCDynamicsSimulator,
-                                t: float) -> np.ndarray:
+    def _default_control_command(self,
+                        dynamics_simulator: ABCDynamicsSimulator, t: float,
+                        previous_control_command: Union[float, np.ndarray] = None,
+                        ) -> Union[float, np.ndarray]:
         """Set default control command given the current state of dynamics simulator.
 
         Parameters
         ----------
         dynamics_simulator: ABCDynamicsSimulator
             Dynamic simulator object
+        t: float
+            Current time
+        previous_control_command: float | ndarray
+            Control command computed by the previous block.
 
         Returns
         -------
         ndarray
             Control command.
         """
-        if self.custom_control_command:
-            return self.custom_control_command(dynamics_simulator, t)
-
         sc = dynamics_simulator.spacecraft
         ref = self.guidance(t, sc.attitude.x)
         e, e_dot = sc.attitude.state_error(ref[:-3], ref[-3:], sc.mean_motion)
@@ -196,3 +199,54 @@ class PDController(Controller):
             Control command.
         """
         return -(e * self.kp + e_dot * self.kd)
+
+
+class NDIModelBased(Controller):
+    """Nonlinear Dynamic Inversion - model based approach.
+
+    Requires a previous controller, since it takes its control command as input
+
+    Attributes
+    ----------
+    following: Controller
+        Controller to be placed after this controller (the output of this controller
+        is the input of the following controller)
+    """
+
+    def __init__(self, following: Controller = None,
+                    custom_control_command: Optional[Callable] = None) -> None:
+        """Initialise the PD controller.
+
+        Parameters
+        ----------
+        following: Controller
+            Controller to be placed after this controller (the output of this controller
+            is the input of the following controller)
+        custom_control_command: Callable
+            Called insted of the default control_command method.
+            It must have the same signatures as the control commands.
+        """
+        super().__init__(None, following, custom_control_command)
+
+    def _default_control_command(self,  # noqa: PLR6301
+                        dynamics_simulator: ABCDynamicsSimulator, t: float,
+                        previous_control_command: Union[float, np.ndarray],
+                        ) -> Union[float, np.ndarray]:
+        """Set default control command given the current state of dynamics simulator.
+
+        Parameters
+        ----------
+        dynamics_simulator: ABCDynamicsSimulator
+            Dynamic simulator object
+        t: float
+            Current time.
+        previous_control_command: float | ndarray
+            Control command computed by the previous block.
+
+        Returns
+        -------
+        ndarray
+            Control command.
+        """
+        ds = dynamics_simulator
+        return ds.inv_gmatrix() @ (previous_control_command - ds.fx())

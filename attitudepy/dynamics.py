@@ -67,6 +67,50 @@ class ABCDynamicsSimulator(ABC):
         """
         return
 
+    @abstractmethod
+    def fx(self) -> np.ndarray:
+        """f(x) function.
+
+        It represents the part of the dynamics equations that do not depend on the
+        external moments.
+
+        Returns
+        -------
+        ndarray
+            Evaluation of f(x) at the current state.
+        """
+        return
+
+    @abstractmethod
+    def gmatrix(self) -> np.ndarray:
+        """G(x) matrix.
+
+        It represents the part of the dynamics equations that depend linearly on
+        the external moments u (or the lienarisation of the G(x,u) function if it
+        is not linearly dependent on u).
+
+        Returns
+        -------
+        ndarray
+            Evaluation of G(x) at the current state.
+        """
+        return
+
+    @abstractmethod
+    def inv_gmatrix(self) -> np.ndarray:
+        """G(x)^-1 matrix.
+
+        It represents inverse of the part of the dynamics equations that depend linearly
+        on the external moments u (or the lienarisation of the G(x,u) function if it
+        is not linearly dependent on u).
+
+        Returns
+        -------
+        ndarray
+            Evaluation of G(x) at the current state.
+        """
+        return
+
 
 class DynamicsSimulatorNoGravityTorque(ABCDynamicsSimulator):
     """Class defining dynamical equations and integration with no gravity torque."""

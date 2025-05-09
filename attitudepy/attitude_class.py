@@ -27,6 +27,17 @@ class Attitude(ABC):
         self.ang = None
         self.w = None
 
+    @property
+    def x(self) -> np.ndarray:
+        """Return the state vector.
+
+        Returns
+        -------
+        ndarray
+            Combination of the state vector.
+        """
+        return np.append(self.ang, self.w)
+
     def kinematic_diff_equation(self, n: float) -> np.ndarray:
         """Compute the kinematic differential equation for attitude.
 
@@ -159,7 +170,6 @@ class AttitudeEuler(Attitude):
 
         self.ang = initial_eul_angles
         self.w = np.array([0, 0, 0])
-        self.x = np.append(self.ang, self.w)
 
     def state_error(self, ref_ang: np.ndarray,
                         ref_thetadot: np.ndarray,
@@ -256,7 +266,6 @@ class AttitudeQuat(Attitude):
 
         self.ang = initial_quat
         self.w = np.array([0, 0, 0])
-        self.x = np.append(self.ang, self.w)
 
     def c_matrix(self) -> np.ndarray:
         """C(ang) matrix to express rotations of attitude angles.

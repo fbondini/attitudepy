@@ -8,6 +8,7 @@ from attitudepy import (
     AttitudeEuler,
     AttitudeQuat,
     DynamicsSimulatorNoGravityTorque,
+    NDIModelBased,
     PDController,
     Spacecraft,
     to_quat_state,
@@ -21,18 +22,20 @@ from plotting_utils import plot_eul, plot_eul_separate, plot_quat, plot_quat_sep
 eul_no_control_no_gravity = True
 eul_no_control = True
 eul_classic_control = True
+eul_model_ndi = True
 
 quat_no_control_no_gravity = True
 quat_no_control = True
 quat_classic_control = True
+quat_model_ndi = True
 
 t = np.arange(0, 1500, 0.1)
 
-classic_kp = [20, 20, 1]
-classic_kd = [120, 120, 6.5]
+classic_kp = [20, 20, 20]
+classic_kd = [120, 120, 120]
 
-classic_kp_quat = [500, 500, 20]
-classic_kd_quat = [300, 300, 10]
+classic_kp_quat = [60, 60, 60]
+classic_kd_quat = [120, 120, 120]
 
 
 def reference_commands(t, x):  # noqa: ANN001, ANN201, D103
@@ -98,6 +101,19 @@ if eul_classic_control:
                 reference_commands)
 
 
+if eul_model_ndi:
+    ndi = NDIModelBased()
+    controller = PDController(classic_kp, classic_kd, reference_commands,
+                                following=ndi)
+    dynamics_simulator = initialise_euler(controller)
+
+    y = dynamics_simulator.simulate(t)
+
+    plot_eul_separate(t, y, ["$\\theta_1$", "$\\theta_2$", "$\\theta_3$"],
+                ["Time (s)", "Angles [deg]"], "Classically controlled attitude - E NDI",
+                reference_commands)
+
+
 if quat_no_control_no_gravity:
     attitude = AttitudeQuat(
             np.array([0, 0, 0, 1]),
@@ -146,12 +162,27 @@ if quat_classic_control:
                 reference_commands)
 
 
+if quat_model_ndi:
+    ndi = NDIModelBased()
+    controller = PDController(classic_kp_quat, classic_kd_quat, reference_commands_quat,
+                                following=ndi)
+    dynamics_simulator = initialise_quat(controller)
+
+    y = dynamics_simulator.simulate(t)
+
+    plot_quat_separate(t, y, ["$\\theta_1$", "$\\theta_2$", "$\\theta_3$"],
+                ["Time (s)", "Angles [deg]"], "Classically controlled attitude - Q NDI",
+                reference_commands)
+
+
 if np.any([
         eul_no_control_no_gravity,
         eul_no_control,
         eul_classic_control,
+        eul_model_ndi,
         quat_no_control_no_gravity,
         quat_no_control,
         quat_classic_control,
+        quat_model_ndi,
 ]):
     plt.show()

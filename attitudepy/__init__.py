@@ -8,7 +8,7 @@ from .attitude_class import (
             to_quat,
             to_quat_state,
 )
-from .controller import Controller, PDController
+from .controller import Controller, NDIModelBased, PDController
 from .dynamics import (
             ABCDynamicsSimulator,
             DynamicsSimulator,
@@ -23,6 +23,7 @@ __all__ = [
             "Controller",
             "DynamicsSimulator",
             "DynamicsSimulatorNoGravityTorque",
+            "NDIModelBased",
             "PDController",
             "Spacecraft",
             "to_euler",
