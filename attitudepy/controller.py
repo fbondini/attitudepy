@@ -180,7 +180,7 @@ class PDController(Controller):
         e, e_dot = sc.attitude.state_error(ref[:-3], ref[-3:], sc.mean_motion)
 
         # with quaternions it only takes the first 3 components
-        return self.control_law(e[:3], e_dot[:3]) + sc.torque_disturb
+        return self.control_law(e[:3], e_dot[:3])
 
     def control_law(self, e: Union[float, np.ndarray],
                 e_dot: Union[float, np.ndarray]) -> Union[float, np.ndarray]:

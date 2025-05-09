@@ -159,7 +159,7 @@ class DynamicsSimulatorNoGravityTorque(ABCDynamicsSimulator):
 
         angdot = sc.attitude.kinematic_diff_equation(sc.mean_motion)
 
-        u = ctrl.full_control_command(dynamics_simulator, t) if ctrl is not None else np.zeros(3)  # noqa: E501
+        u = ctrl.full_control_command(dynamics_simulator, t) + sc.torque_disturb if ctrl is not None else np.zeros(3)  # noqa: E501
 
         return np.append(angdot, dynamics_simulator.fx() + dynamics_simulator.gmatrix() @ u)  # noqa: E501
 
