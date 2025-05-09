@@ -13,21 +13,26 @@ from attitudepy import (
     Spacecraft,
     to_quat_state,
 )
-from plotting_utils import plot_eul, plot_eul_separate, plot_quat, plot_quat_separate
+from plotting_utils import (
+    plot_eul,
+    plot_eul_separate,
+    plot_quat,
+    plot_quat_separate,
+)
 
 # ###################################
 # # Main function options
 # ###################################
 
-eul_no_control_no_gravity = True
+eul_no_control_no_gravity = False
 eul_no_control = True
-eul_classic_control = True
-eul_model_ndi = True
+eul_classic_control = False
+eul_model_ndi = False
 
-quat_no_control_no_gravity = True
-quat_no_control = True
-quat_classic_control = True
-quat_model_ndi = True
+quat_no_control_no_gravity = False
+quat_no_control = False
+quat_classic_control = False
+quat_model_ndi = False
 
 t = np.arange(0, 1500, 0.1)
 
@@ -80,7 +85,6 @@ if eul_no_control_no_gravity:
 
     plot_eul(t, y, ["$\\theta_1$", "$\\theta_2$", "$\\theta_3$"],
                 ["Time (s)", "Angles [deg]"], "No control, no gravity gradient torque - E")  # noqa: E501
-
 
 if eul_no_control:
     dynamics_simulator = initialise_euler()

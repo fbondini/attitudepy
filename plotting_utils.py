@@ -62,6 +62,26 @@ def plot_eul_separate(t: np.ndarray, y: np.ndarray, labels: List[str],
     plt.tight_layout()
 
 
+def plot_w(t: np.ndarray, w: np.ndarray, labels: List,
+                axislabels: List, title: Optional[str] = None,
+                ) -> None:
+    """Plot angular velocity with provided settings."""
+    style.use("default.mplstyle")
+
+    plt.figure()
+
+    plt.plot(t, w[:, 0] * 180 / np.pi, label=labels[0])
+    plt.plot(t, w[:, 1] * 180 / np.pi, label=labels[1])
+    plt.plot(t, w[:, 2] * 180 / np.pi, label=labels[2])
+
+    plt.grid(True)  # noqa: FBT003
+    plt.legend(loc="best")
+    plt.xlabel(axislabels[0])
+    plt.ylabel(axislabels[1])
+    if title is not None:
+        plt.title(title)
+    plt.tight_layout()
+
 def plot_quat(t: np.ndarray, q: np.ndarray, labels: List,
                 axislabels: List, title: Optional[str] = None,
                 ) -> None:
