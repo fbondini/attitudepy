@@ -5,8 +5,9 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Callable, Optional, Union
 
+import numpy as np
+
 if TYPE_CHECKING:
-    import numpy as np
     from dynamics import ABCDynamicsSimulator
 
 
@@ -178,9 +179,11 @@ class PDController(Controller):
         sc = dynamics_simulator.spacecraft
         ref = self.guidance(t, sc.attitude.x)
         e, e_dot = sc.attitude.state_error(ref[:-3], ref[-3:], sc.mean_motion)
+        if len(e) == 4:
+            e_dot = np.append(e_dot, 0)
 
         # with quaternions it only takes the first 3 components
-        return self.control_law(e[:3], e_dot[:3])
+        return self.control_law(e, e_dot)
 
     def control_law(self, e: Union[float, np.ndarray],
                 e_dot: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
@@ -230,8 +233,8 @@ class NDIModelBased(Controller):
 
     def _default_control_command(self,  # noqa: PLR6301
                         dynamics_simulator: ABCDynamicsSimulator, t: float,
-                        previous_control_command: Union[float, np.ndarray],
-                        ) -> Union[float, np.ndarray]:
+                        previous_control_command: np.ndarray,
+                        ) -> np.ndarray:
         """Set default control command given the current state of dynamics simulator.
 
         Parameters
@@ -240,7 +243,7 @@ class NDIModelBased(Controller):
             Dynamic simulator object
         t: float
             Current time.
-        previous_control_command: float | ndarray
+        previous_control_command: ndarray
             Control command computed by the previous block.
 
         Returns
@@ -249,4 +252,57 @@ class NDIModelBased(Controller):
             Control command.
         """
         ds = dynamics_simulator
-        return ds.inv_gmatrix() @ (previous_control_command - ds.fx())
+        return ds.inv_gmatrix() @ (previous_control_command[:3] - ds.fx())
+
+
+class NDITimeScaleSeparation(NDIModelBased):
+    """Nonlinear Dynamic Inversion - time-scale separation approach.
+
+    Requires a previous controller, since it takes its control command as input
+
+    Attributes
+    ----------
+    following: Controller
+        Controller to be placed after this controller (the output of this controller
+        is the input of the following controller)
+    """
+
+    def __init__(self, following: Controller = None,
+                    custom_control_command: Optional[Callable] = None) -> None:
+        """Initialise the PD controller.
+
+        Parameters
+        ----------
+        following: Controller
+            Controller to be placed after this controller (the output of this controller
+            is the input of the following controller)
+        custom_control_command: Callable
+            Called insted of the default control_command method.
+            It must have the same signatures as the control commands.
+        """
+        super().__init__(following, custom_control_command)
+
+    def _default_control_command(self,
+                        dynamics_simulator: ABCDynamicsSimulator, t: float,
+                        previous_control_command: np.ndarray,
+                        ) -> np.ndarray:
+        """Set default control command given the current state of dynamics simulator.
+
+        Parameters
+        ----------
+        dynamics_simulator: ABCDynamicsSimulator
+            Dynamic simulator object
+        t: float
+            Current time.
+        previous_control_command: ndarray
+            Control command computed by the previous block.
+
+        Returns
+        -------
+        ndarray
+            Control command.
+        """
+        ds = dynamics_simulator
+        outer_loop_control = np.linalg.inv(ds.spacecraft.attitude.w2angdot_matrix()) \
+                                    @ previous_control_command
+        return super()._default_control_command(ds, t, outer_loop_control)

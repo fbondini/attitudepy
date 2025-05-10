@@ -159,7 +159,7 @@ class DynamicsSimulatorNoGravityTorque(ABCDynamicsSimulator):
 
         angdot = sc.attitude.kinematic_diff_equation(sc.mean_motion)
 
-        u = ctrl.full_control_command(dynamics_simulator, t) + sc.torque_disturb if ctrl is not None else np.zeros(3)  # noqa: E501
+        u = ctrl.full_control_command(dynamics_simulator, t)[:3] + sc.torque_disturb if ctrl is not None else np.zeros(3)  # noqa: E501
 
         return np.append(angdot, dynamics_simulator.fx() + dynamics_simulator.gmatrix() @ u)  # noqa: E501
 
@@ -175,8 +175,8 @@ class DynamicsSimulatorNoGravityTorque(ABCDynamicsSimulator):
             Evaluation of f(x) at the current state.
         """
         sc = self.spacecraft
-        return np.linalg.inv(sc.inertia) @ sc.attitude.s_matrix() @ sc.inertia \
-                                                    @ sc.attitude.w
+        return -np.linalg.inv(sc.inertia) @ np.cross(sc.attitude.w,
+                                                        sc.inertia @ sc.attitude.w)
 
     def gmatrix(self) -> np.ndarray:
         """G(x) matrix.

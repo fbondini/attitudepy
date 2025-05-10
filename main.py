@@ -7,12 +7,15 @@ from assignment_data import initialise_euler, initialise_quat
 from attitudepy import (
     AttitudeEuler,
     AttitudeQuat,
-    DynamicsSimulatorNoGravityTorque,
-    NDIModelBased,
-    PDController,
     Spacecraft,
     to_quat_state,
 )
+from attitudepy.controller import (
+    NDIModelBased,
+    NDITimeScaleSeparation,
+    PDController,
+)
+from attitudepy.dynamics import DynamicsSimulatorNoGravityTorque
 from plotting_utils import (
     plot_eul,
     plot_eul_separate,
@@ -25,22 +28,24 @@ from plotting_utils import (
 # ###################################
 
 eul_no_control_no_gravity = False
-eul_no_control = True
+eul_no_control = False
 eul_classic_control = False
 eul_model_ndi = False
+eul_timescale_ndi = False
 
 quat_no_control_no_gravity = False
 quat_no_control = False
-quat_classic_control = False
-quat_model_ndi = False
+quat_classic_control = True
+quat_model_ndi = True
+quat_timescale_ndi = True
 
 t = np.arange(0, 1500, 0.1)
 
 classic_kp = [20, 20, 20]
 classic_kd = [120, 120, 120]
 
-classic_kp_quat = [60, 60, 60]
-classic_kd_quat = [120, 120, 120]
+classic_kp_quat = [60, 60, 60, 0]
+classic_kd_quat = [120, 120, 120, 0]
 
 
 def reference_commands(t, x):  # noqa: ANN001, ANN201, D103
@@ -84,14 +89,14 @@ if eul_no_control_no_gravity:
     y = dynamics_simulator.simulate(t)
 
     plot_eul(t, y, ["$\\theta_1$", "$\\theta_2$", "$\\theta_3$"],
-                ["Time (s)", "Angles [deg]"], "No control, no gravity gradient torque - E")  # noqa: E501
+                ["Time (s)", "Angles (deg)"], "No control, no gravity gradient torque - E")  # noqa: E501
 
 if eul_no_control:
     dynamics_simulator = initialise_euler()
     y = dynamics_simulator.simulate(t)
 
     plot_eul(t, y, ["$\\theta_1$", "$\\theta_2$", "$\\theta_3$"],
-                ["Time (s)", "Angles [deg]"], "Non-controlled attitude - E")
+                ["Time (s)", "Angles (deg)"], "Non-controlled attitude - E")
 
 
 if eul_classic_control:
@@ -101,7 +106,7 @@ if eul_classic_control:
     y = dynamics_simulator.simulate(t)
 
     plot_eul_separate(t, y, ["$\\theta_1$", "$\\theta_2$", "$\\theta_3$"],
-                ["Time (s)", "Angles [deg]"], "Classically controlled attitude - E",
+                ["Time (s)", "Angles (deg)"], "Classically controlled attitude - E",
                 reference_commands)
 
 
@@ -114,7 +119,20 @@ if eul_model_ndi:
     y = dynamics_simulator.simulate(t)
 
     plot_eul_separate(t, y, ["$\\theta_1$", "$\\theta_2$", "$\\theta_3$"],
-                ["Time (s)", "Angles [deg]"], "Classically controlled attitude - E NDI",
+                ["Time (s)", "Angles (deg)"], "Model based NDI controlled attitude - E",
+                reference_commands)
+
+
+if eul_timescale_ndi:
+    ndi = NDITimeScaleSeparation()
+    controller = PDController(classic_kp, classic_kd, reference_commands,
+                                following=ndi)
+    dynamics_simulator = initialise_euler(controller)
+
+    y = dynamics_simulator.simulate(t)
+
+    plot_eul_separate(t, y, ["$\\theta_1$", "$\\theta_2$", "$\\theta_3$"],
+                ["Time (s)", "Angles (deg)"], "Time Scale Sep. NDI controlled attitude - E",  # noqa: E501
                 reference_commands)
 
 
@@ -140,7 +158,7 @@ if quat_no_control_no_gravity:
     y = dynamics_simulator.simulate(t)
 
     plot_quat(t, y, ["$\\theta_1$", "$\\theta_2$", "$\\theta_3$"],
-                ["Time (s)", "Angles [deg]"], "No control, no gravity gradient torque - Q")  # noqa: E501
+                ["Time (s)", "Angles (deg)"], "No control, no gravity gradient torque - Q")  # noqa: E501
 
 
 if quat_no_control:
@@ -149,7 +167,7 @@ if quat_no_control:
     y = dynamics_simulator.simulate(t)
 
     plot_quat(t, y, ["$\\theta_1$", "$\\theta_2$", "$\\theta_3$"],
-                ["Time (s)", "Angles [deg]"], "Non-controlled attitude - Q")
+                ["Time (s)", "Angles (deg)"], "Non-controlled attitude - Q")
 
 
 if quat_classic_control:
@@ -162,7 +180,7 @@ if quat_classic_control:
         y[i, :4] /= np.linalg.norm(y[i, :4])
 
     plot_quat_separate(t, y, ["$\\theta_1$", "$\\theta_2$", "$\\theta_3$"],
-                ["Time (s)", "Angles [deg]"], "Classically controlled attitude - Q",
+                ["Time (s)", "Angles (deg)"], "Classically controlled attitude - Q",
                 reference_commands)
 
 
@@ -175,7 +193,20 @@ if quat_model_ndi:
     y = dynamics_simulator.simulate(t)
 
     plot_quat_separate(t, y, ["$\\theta_1$", "$\\theta_2$", "$\\theta_3$"],
-                ["Time (s)", "Angles [deg]"], "Classically controlled attitude - Q NDI",
+                ["Time (s)", "Angles (deg)"], "Model based NDI controlled attitude - Q",
+                reference_commands)
+
+
+if quat_timescale_ndi:
+    ndi = NDITimeScaleSeparation()
+    controller = PDController(classic_kp_quat, classic_kd_quat, reference_commands_quat,
+                                following=ndi)
+    dynamics_simulator = initialise_quat(controller)
+
+    y = dynamics_simulator.simulate(t)
+
+    plot_quat_separate(t, y, ["$\\theta_1$", "$\\theta_2$", "$\\theta_3$"],
+                ["Time (s)", "Angles (deg)"], "Time Scale Sep. NDI controlled attitude - Q",  # noqa: E501
                 reference_commands)
 
 
@@ -184,9 +215,11 @@ if np.any([
         eul_no_control,
         eul_classic_control,
         eul_model_ndi,
+        eul_timescale_ndi,
         quat_no_control_no_gravity,
         quat_no_control,
         quat_classic_control,
         quat_model_ndi,
+        quat_timescale_ndi,
 ]):
     plt.show()

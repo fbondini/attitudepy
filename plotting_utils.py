@@ -82,6 +82,7 @@ def plot_w(t: np.ndarray, w: np.ndarray, labels: List,
         plt.title(title)
     plt.tight_layout()
 
+
 def plot_quat(t: np.ndarray, q: np.ndarray, labels: List,
                 axislabels: List, title: Optional[str] = None,
                 ) -> None:

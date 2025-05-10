@@ -4,11 +4,11 @@ import numpy as np
 from attitudepy import (
     AttitudeEuler,
     AttitudeQuat,
-    Controller,
-    DynamicsSimulator,
     Spacecraft,
     to_quat,
 )
+from attitudepy.controller import Controller
+from attitudepy.dynamics import DynamicsSimulator
 
 
 def initialise_euler(controller: Controller = None) -> DynamicsSimulator:
@@ -26,7 +26,7 @@ def initialise_euler(controller: Controller = None) -> DynamicsSimulator:
             [      0,       0, 0.704],  # noqa: E201, E241
         ]),
         torque_disturb=np.array([
-            0.001, 0.001, 0.001,  # Nm
+            0.05, 0.05, 0.05,  # Nm
         ]),
     )
 
