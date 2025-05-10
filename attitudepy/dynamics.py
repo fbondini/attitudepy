@@ -2,43 +2,47 @@
 from abc import ABC, abstractmethod
 
 import numpy as np
-from scipy.integrate import odeint
 
 from .controller import Controller
+from .integration import IntegratorSettings
 from .spacecraft_class import Spacecraft
 
 
 class ABCDynamicsSimulator(ABC):
     """Abstract class for defining dynamical equations and integration."""
 
-    def __init__(self, spacecraft: Spacecraft, control: Controller = None) -> None:
+    def __init__(self, spacecraft: Spacecraft,
+                    integrator_settings: IntegratorSettings,
+                    control: Controller = None) -> None:
         """Initialise the dynamics simulator.
 
         Parameters
         ----------
         spacecraft: Spacecraft
             Spacecraft object
+        integrator_settings: IntegratorSettings
+            Object defining the integrator algorithm, time vector, and other settings
         control: Controller (optional)
             Controller object
         """
         self.spacecraft = spacecraft
         self.control = control
+        self.integrator_settings = integrator_settings
 
-    def simulate(self, tvect: np.ndarray) -> np.ndarray:
+    def simulate(self) -> np.ndarray:
         """Integrates the dynamical equations at the provided timesteps.
-
-        Parameters
-        ----------
-        tvect: ndarray
-            Vector of times at which the dynamics must be integrated.
 
         Returns
         -------
-        ndarray
-            y output of scipy.integrate.odeint
+        dict
+            Dictionary containing the times as keys and np.ndarrays of
+            the state at that time for every entry.
         """
-        return odeint(self.dynamics_equation, self.spacecraft.attitude.x,
-                            tvect, (self,))
+        return self.integrator_settings.integrate(
+            self.dynamics_equation,
+            self.spacecraft.attitude.x,
+            (self,),
+        )
 
     @staticmethod
     @abstractmethod
@@ -115,17 +119,21 @@ class ABCDynamicsSimulator(ABC):
 class DynamicsSimulatorNoGravityTorque(ABCDynamicsSimulator):
     """Class defining dynamical equations and integration with no gravity torque."""
 
-    def __init__(self, spacecraft: Spacecraft, control: Controller = None) -> None:
+    def __init__(self, spacecraft: Spacecraft,
+                    integrator_settings: IntegratorSettings,
+                    control: Controller = None) -> None:
         """Initialise the dynamics simulator.
 
         Parameters
         ----------
         spacecraft: Spacecraft
             Spacecraft object
+        integrator_settings: IntegratorSettings
+            Object defining the integrator algorithm, time vector, and other settings
         control: Controller (optional)
             Controller object
         """
-        super().__init__(spacecraft, control)
+        super().__init__(spacecraft, integrator_settings, control)
 
     @staticmethod
     def dynamics_equation(x: np.ndarray, t: float,
@@ -210,17 +218,21 @@ class DynamicsSimulatorNoGravityTorque(ABCDynamicsSimulator):
 class DynamicsSimulator(DynamicsSimulatorNoGravityTorque):
     """Class defining the standard dynamical equations and integration."""
 
-    def __init__(self, spacecraft: Spacecraft, control: Controller = None) -> None:
+    def __init__(self, spacecraft: Spacecraft,
+                    integrator_settings: IntegratorSettings,
+                    control: Controller = None) -> None:
         """Initialise the dynamics simulator.
 
         Parameters
         ----------
         spacecraft: Spacecraft
             Spacecraft object
+        integrator_settings: IntegratorSettings
+            Object defining the integrator algorithm, time vector, and other settings
         control: Controller (optional)
             Controller object
         """
-        super().__init__(spacecraft, control)
+        super().__init__(spacecraft, integrator_settings, control)
 
     @staticmethod
     def dynamics_equation(x: np.ndarray, t: float,

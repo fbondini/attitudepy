@@ -76,3 +76,4 @@ Desktop.ini
 # Project-specific files
 verify
 .dist
+_nw*
