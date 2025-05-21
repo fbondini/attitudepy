@@ -15,7 +15,7 @@ class Controller(ABC):  # noqa: D101
     @abstractmethod
     def __init__(self,
             guidance: Optional[Callable[[float, np.ndarray], np.ndarray]] = None,
-            following: Controller = None,
+            following: Controller = None, sample_time: float = -1,
             custom_control_command: Optional[Callable] = None) -> None:
         """ABC initialiser.
 
@@ -34,6 +34,10 @@ class Controller(ABC):  # noqa: D101
         self.guidance = guidance
         self.following = following
         self.custom_control_command = custom_control_command
+        self.sample_time = sample_time
+        self.cached_u = None
+        self.last_activation_time = -1
+        self.cached_state = None
 
     def full_control_command(self, dynamics_simulator: ABCDynamicsSimulator, t: float,
                         previous_control_command: Union[float, np.ndarray] = None,
@@ -83,11 +87,21 @@ class Controller(ABC):  # noqa: D101
         float | ndarray
             Control command.
         """
-        if self.custom_control_command is not None:
-            return self.custom_control_command(dynamics_simulator, t,
-                                                previous_control_command)
-        return self._default_control_command(dynamics_simulator, t,
-                                                previous_control_command)
+        if self.sample_time < 0:
+            if self.custom_control_command is not None:
+                return self.custom_control_command(dynamics_simulator, t,
+                                                    previous_control_command)
+            return self._default_control_command(dynamics_simulator, t,
+                                                    previous_control_command)
+
+        if (t - self.last_activation_time) >= self.sample_time:
+            self.last_activation_time = t
+            if self.custom_control_command is not None:
+                self.cached_u = self.custom_control_command(dynamics_simulator, t,
+                                                    previous_control_command)
+            self.cached_u = self._default_control_command(dynamics_simulator, t,
+                                                    previous_control_command)
+        return self.cached_u
 
     @abstractmethod
     def _default_control_command(self,
@@ -132,7 +146,7 @@ class PDController(Controller):
 
     def __init__(self, kp: Union[float, np.ndarray], kd: Union[float, np.ndarray],
                     guidance: Callable[[float, np.ndarray], np.ndarray],
-                    following: Controller = None,
+                    following: Controller = None, sample_time: float = -1,
                     custom_control_command: Optional[Callable] = None) -> None:
         """Initialise the PD controller.
 
@@ -151,12 +165,40 @@ class PDController(Controller):
         custom_control_command: Callable
             Called insted of the default control_command method.
             It must have the same signatures as the control commands.
+
         """
-        super().__init__(guidance, following, custom_control_command)
+        super().__init__(guidance, following, sample_time, custom_control_command)
         self.kp = kp
         self.kd = kd
 
     def _default_control_command(self,
+                        dynamics_simulator: ABCDynamicsSimulator, t: float,
+                        previous_control_command: Union[float, np.ndarray] = None,
+                        ) -> Union[float, np.ndarray]:
+        """Set default control command given the current state of dynamics simulator.
+
+        Parameters
+        ----------
+        dynamics_simulator: ABCDynamicsSimulator
+            Dynamic simulator object
+        t: float
+            Current time
+        previous_control_command: float | ndarray
+            Control command computed by the previous block.
+
+        Returns
+        -------
+        ndarray
+            Control command.
+        """
+        if self.sample_time < 0:
+            return self._default_continuous_control_command(dynamics_simulator, t,
+                                                    previous_control_command)
+
+        return self._default_discrete_control_command(dynamics_simulator, t,
+                                                    previous_control_command)
+
+    def _default_continuous_control_command(self,
                         dynamics_simulator: ABCDynamicsSimulator, t: float,
                         previous_control_command: Union[float, np.ndarray] = None,
                         ) -> Union[float, np.ndarray]:
@@ -185,6 +227,34 @@ class PDController(Controller):
         # with quaternions it only takes the first 3 components
         return self.control_law(e, e_dot)
 
+    def _default_discrete_control_command(self,
+                        dynamics_simulator: ABCDynamicsSimulator, t: float,
+                        previous_control_command: Union[float, np.ndarray] = None,
+                        ) -> Union[float, np.ndarray]:
+        """Set default control command given the current state of dynamics simulator.
+
+        Parameters
+        ----------
+        dynamics_simulator: ABCDynamicsSimulator
+            Dynamic simulator object
+        t: float
+            Current time
+        previous_control_command: float | ndarray
+            Control command computed by the previous block.
+
+        Returns
+        -------
+        ndarray
+            Control command.
+        """
+        sc = dynamics_simulator.spacecraft
+        ref = self.guidance(t, sc.attitude.x)
+        e, _ = sc.attitude.state_error(ref[:-3], ref[-3:], sc.mean_motion)
+
+        # with quaternions it only takes the first 3 components
+        return self.control_law(e, sc.attitude.w if len(e) == 3
+                                    else np.append(sc.attitude.w, 0))
+
     def control_law(self, e: Union[float, np.ndarray],
                 e_dot: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
         """Compute the control variable given input error and its derivative.
@@ -207,7 +277,8 @@ class PDController(Controller):
 class NDIModelBased(Controller):
     """Nonlinear Dynamic Inversion - model based approach.
 
-    Requires a previous controller, since it takes its control command as input
+    Requires a previous controller, since it takes its control command as input.
+    The sample time is inherited from the previous controller.
 
     Attributes
     ----------
@@ -218,7 +289,7 @@ class NDIModelBased(Controller):
 
     def __init__(self, following: Controller = None,
                     custom_control_command: Optional[Callable] = None) -> None:
-        """Initialise the PD controller.
+        """Initialise the model based NDI controller.
 
         Parameters
         ----------
@@ -229,7 +300,7 @@ class NDIModelBased(Controller):
             Called insted of the default control_command method.
             It must have the same signatures as the control commands.
         """
-        super().__init__(None, following, custom_control_command)
+        super().__init__(None, following, -1, custom_control_command)
 
     def _default_control_command(self,  # noqa: PLR6301
                         dynamics_simulator: ABCDynamicsSimulator, t: float,
@@ -279,7 +350,9 @@ class NDITimeScaleSeparation(NDIModelBased):
 
     def __init__(self, following: Controller = None,
                     custom_control_command: Optional[Callable] = None) -> None:
-        """Initialise the PD controller.
+        """Initialise the timescale separation NDI controller.
+
+        The sample time is inherited from the previous controller.
 
         Parameters
         ----------

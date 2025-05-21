@@ -59,7 +59,7 @@ def initialise_quat(controller: Controller = None) -> DynamicsSimulator:
             [      0,       0, 0.704],  # noqa: E201, E241
         ]),
         torque_disturb=np.array([
-            0.001, 0.001, 0.001,  # Nm
+            0.0001, 0.0001, 0.0001,  # Nm
         ]),
     )
 

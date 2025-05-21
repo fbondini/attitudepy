@@ -31,13 +31,13 @@ from plotting_utils import (
 eul_no_control_no_gravity = False
 eul_no_control = False
 eul_classic_control = False
-eul_model_ndi = False
+eul_model_ndi = True
 eul_timescale_ndi = False
 
 quat_no_control_no_gravity = False
 quat_no_control = False
-quat_classic_control = True
-quat_model_ndi = True
+quat_classic_control = False
+quat_model_ndi = False
 quat_timescale_ndi = False
 
 tspan = [0, 1500]
@@ -45,11 +45,16 @@ tstep = 0.1
 t = np.arange(tspan[0], tspan[1] + tstep, tstep)
 integrator_settings = ScipyIntegrator(t)
 
-classic_kp = [20, 20, 20]
-classic_kd = [120, 120, 120]
+# classic_kp = [5, 5, 2]
+# classic_kd = [40, 40, 4]
+
+classic_kp = np.array([3, 3, 3])
+classic_kd = np.array([4, 4, 4])
 
 classic_kp_quat = [90, 90, 90, 0]
 classic_kd_quat = [120, 120, 120, 0]
+
+tsample = 0.1
 
 
 def reference_commands(t, x):  # noqa: ANN001, ANN201, D103
@@ -110,7 +115,8 @@ if eul_no_control:
 
 
 if eul_classic_control:
-    controller = PDController(classic_kp, classic_kd, reference_commands)
+    controller = PDController(classic_kp, classic_kd, reference_commands,
+                                sample_time=tsample)
     dynamics_simulator = initialise_euler(controller)
 
     state_history = dynamics_simulator.simulate()
@@ -125,7 +131,7 @@ if eul_classic_control:
 if eul_model_ndi:
     ndi = NDIModelBased()
     controller = PDController(classic_kp, classic_kd, reference_commands,
-                                following=ndi)
+                                following=ndi, sample_time=tsample)
     dynamics_simulator = initialise_euler(controller)
 
     state_history = dynamics_simulator.simulate()
@@ -140,7 +146,7 @@ if eul_model_ndi:
 if eul_timescale_ndi:
     ndi = NDITimeScaleSeparation()
     controller = PDController(classic_kp, classic_kd, reference_commands,
-                                following=ndi)
+                                following=ndi, sample_time=tsample)
     dynamics_simulator = initialise_euler(controller)
 
     state_history = dynamics_simulator.simulate()
@@ -193,7 +199,8 @@ if quat_no_control:
 
 
 if quat_classic_control:
-    controller = PDController(classic_kp_quat, classic_kd_quat, reference_commands_quat)
+    controller = PDController(classic_kp_quat, classic_kd_quat, reference_commands_quat,
+                                sample_time=tsample)
     dynamics_simulator = initialise_quat(controller)
 
     state_history = dynamics_simulator.simulate()
@@ -211,7 +218,7 @@ if quat_classic_control:
 if quat_model_ndi:
     ndi = NDIModelBased()
     controller = PDController(classic_kp_quat, classic_kd_quat, reference_commands_quat,
-                                following=ndi)
+                                following=ndi, sample_time=tsample)
     dynamics_simulator = initialise_quat(controller)
 
     state_history = dynamics_simulator.simulate()
@@ -226,7 +233,7 @@ if quat_model_ndi:
 if quat_timescale_ndi:
     ndi = NDITimeScaleSeparation()
     controller = PDController(classic_kp_quat, classic_kd_quat, reference_commands_quat,
-                                following=ndi)
+                                following=ndi, sample_time=tsample)
     dynamics_simulator = initialise_quat(controller)
 
     state_history = dynamics_simulator.simulate()
