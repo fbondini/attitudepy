@@ -13,7 +13,7 @@ from attitudepy import (
 from attitudepy.controller import (
     NDIModelBased,
     NDITimeScaleSeparation,
-    PDController,
+    PIDController,
 )
 from attitudepy.dynamics import DynamicsSimulatorNoGravityTorque
 from attitudepy.integration import ScipyIntegrator
@@ -22,6 +22,7 @@ from plotting_utils import (
     plot_eul_separate,
     plot_quat,
     plot_quat_separate,
+    plot_w_separate,
 )
 
 # ###################################
@@ -30,7 +31,7 @@ from plotting_utils import (
 
 eul_no_control_no_gravity = False
 eul_no_control = False
-eul_classic_control = False
+eul_classic_control = True
 eul_model_ndi = True
 eul_timescale_ndi = False
 
@@ -41,19 +42,33 @@ quat_model_ndi = False
 quat_timescale_ndi = False
 
 tspan = [0, 1500]
-tstep = 0.1
+tstep = 0.01
 t = np.arange(tspan[0], tspan[1] + tstep, tstep)
 integrator_settings = ScipyIntegrator(t)
 
-# classic_kp = [5, 5, 2]
-# classic_kd = [40, 40, 4]
+# ###################################
+# # PID controller gains
+# ###################################
 
-classic_kp = np.array([3, 3, 3])
-classic_kd = np.array([4, 4, 4])
+# Note that these have been tuned for the discrete control
+# system, might be slightly different for the continous one.
 
-classic_kp_quat = [90, 90, 90, 0]
-classic_kd_quat = [120, 120, 120, 0]
+# Gains for the classic control loop (Euler angles)
+classic_kp = np.array([10, 5, 0.5])
+classic_ki = np.array([0, 0, 0])
+classic_kd = np.array([70, 70, 2])
 
+# Gains for the NDI control loops (Euler angles)
+ndi_kp = np.array([1, 1, 1])
+ndi_ki = np.array([0, 0, 0])
+ndi_kd = np.array([2, 2, 2])
+
+# Gains for the classic control loop (quaternions angles)
+classic_kp_quat = np.array([10, 5, 0.5, 0])
+classic_ki_quat = np.array([0, 0, 0, 0])
+classic_kd_quat = np.array([50, 50, 1.19, 0])
+
+# Controller sample time
 tsample = 0.1
 
 
@@ -94,6 +109,7 @@ if eul_no_control_no_gravity:
         ]),
     )
 
+    print("Running Euler angles, no control, no distrubance simulation")
     dynamics_simulator = DynamicsSimulatorNoGravityTorque(spacecraft,
                                                             integrator_settings)
     state_history = dynamics_simulator.simulate()
@@ -106,6 +122,7 @@ if eul_no_control_no_gravity:
 if eul_no_control:
     dynamics_simulator = initialise_euler()
 
+    print("Running Euler angles, no control simulation")
     state_history = dynamics_simulator.simulate()
     time = np.array(list(state_history.keys()))
     state = np.vstack(list(state_history.values()))
@@ -113,12 +130,19 @@ if eul_no_control:
     plot_eul(time, state, ["$\\theta_1$", "$\\theta_2$", "$\\theta_3$"],
                 ["Time (s)", "Angles (deg)"], "Non-controlled attitude - E")
 
+    plot_eul_separate(time, state, ["$\\theta_1$", "$\\theta_2$", "$\\theta_3$"],
+                ["Time (s)", "Angles (deg)"], "No control - E")
+
+    plot_w_separate(time, state, ["$\\omega_1$", "$\\omega_2$", "$\\omega_3$"],
+                ["Time (s)", "Angular rates (deg/s)"], "No control - E")
+
 
 if eul_classic_control:
-    controller = PDController(classic_kp, classic_kd, reference_commands,
+    controller = PIDController(classic_kp, classic_ki, classic_kd, reference_commands,
                                 sample_time=tsample)
     dynamics_simulator = initialise_euler(controller)
 
+    print("Running Euler angles, classic control loop simulation")
     state_history = dynamics_simulator.simulate()
     time = np.array(list(state_history.keys()))
     state = np.vstack(list(state_history.values()))
@@ -130,10 +154,11 @@ if eul_classic_control:
 
 if eul_model_ndi:
     ndi = NDIModelBased()
-    controller = PDController(classic_kp, classic_kd, reference_commands,
+    controller = PIDController(ndi_kp, ndi_ki, ndi_kd, reference_commands,
                                 following=ndi, sample_time=tsample)
     dynamics_simulator = initialise_euler(controller)
 
+    print("Running Euler angles, NDI control loop simulation")
     state_history = dynamics_simulator.simulate()
     time = np.array(list(state_history.keys()))
     state = np.vstack(list(state_history.values()))
@@ -145,10 +170,11 @@ if eul_model_ndi:
 
 if eul_timescale_ndi:
     ndi = NDITimeScaleSeparation()
-    controller = PDController(classic_kp, classic_kd, reference_commands,
+    controller = PIDController(classic_kp, classic_ki, classic_kd, reference_commands,
                                 following=ndi, sample_time=tsample)
     dynamics_simulator = initialise_euler(controller)
 
+    print("Running Euler angles, timscale separation NDI control loop simulation")
     state_history = dynamics_simulator.simulate()
     time = np.array(list(state_history.keys()))
     state = np.vstack(list(state_history.values()))
@@ -197,10 +223,16 @@ if quat_no_control:
     plot_quat(time, state, ["$\\theta_1$", "$\\theta_2$", "$\\theta_3$"],
                 ["Time (s)", "Angles (deg)"], "Non-controlled attitude - Q")
 
+    plot_quat_separate(time, state, ["$\\theta_1$", "$\\theta_2$", "$\\theta_3$"],
+                ["Time (s)", "Angles (deg)"], "No control - Q")
+
+    plot_w_separate(time, state, ["$\\omega_1$", "$\\omega_2$", "$\\omega_3$"],
+                ["Time (s)", "Angular rates (deg/s)"], "No control - Q", from_quat=1)
+
 
 if quat_classic_control:
-    controller = PDController(classic_kp_quat, classic_kd_quat, reference_commands_quat,
-                                sample_time=tsample)
+    controller = PIDController(classic_kp_quat, classic_ki_quat, classic_kd_quat,
+                                reference_commands_quat, sample_time=tsample)
     dynamics_simulator = initialise_quat(controller)
 
     state_history = dynamics_simulator.simulate()
@@ -217,7 +249,8 @@ if quat_classic_control:
 
 if quat_model_ndi:
     ndi = NDIModelBased()
-    controller = PDController(classic_kp_quat, classic_kd_quat, reference_commands_quat,
+    controller = PIDController(classic_kp_quat, classic_ki_quat, classic_kd_quat,
+                                reference_commands_quat,
                                 following=ndi, sample_time=tsample)
     dynamics_simulator = initialise_quat(controller)
 
@@ -232,7 +265,8 @@ if quat_model_ndi:
 
 if quat_timescale_ndi:
     ndi = NDITimeScaleSeparation()
-    controller = PDController(classic_kp_quat, classic_kd_quat, reference_commands_quat,
+    controller = PIDController(classic_kp_quat, classic_ki_quat, classic_kd_quat,
+                                reference_commands_quat,
                                 following=ndi, sample_time=tsample)
     dynamics_simulator = initialise_quat(controller)
 

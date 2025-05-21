@@ -127,8 +127,8 @@ class Controller(ABC):  # noqa: D101
         return
 
 
-class PDController(Controller):
-    """PD controller.
+class PIDController(Controller):
+    """PID controller.
 
     Attributes
     ----------
@@ -144,7 +144,8 @@ class PDController(Controller):
         is the input of the following controller)
     """
 
-    def __init__(self, kp: Union[float, np.ndarray], kd: Union[float, np.ndarray],
+    def __init__(self, kp: Union[float, np.ndarray], ki: Union[float, np.ndarray],
+                    kd: Union[float, np.ndarray],
                     guidance: Callable[[float, np.ndarray], np.ndarray],
                     following: Controller = None, sample_time: float = -1,
                     custom_control_command: Optional[Callable] = None) -> None:
@@ -154,6 +155,8 @@ class PDController(Controller):
         ----------
         kp: float | ndarray
             Proportional gains
+        ki: float | ndarray
+            Inetgral gains. Works only for discrete control.
         kd: float | ndarray
             Derivative gains
         guidance: callable
@@ -166,10 +169,21 @@ class PDController(Controller):
             Called insted of the default control_command method.
             It must have the same signatures as the control commands.
 
+        Raises
+        ------
+        ValueError
+            If ki is not 0 and sample time is negative.
         """
         super().__init__(guidance, following, sample_time, custom_control_command)
         self.kp = kp
         self.kd = kd
+        self.ki = ki
+        if np.any(self.ki != 0) and self.sample_time < 0:
+            msg = ("Integral control is not supported for continuous control. "
+                            "Please set a sample time.")
+            raise ValueError(msg)
+
+        self.prev_e = None
 
     def _default_control_command(self,
                         dynamics_simulator: ABCDynamicsSimulator, t: float,
@@ -251,11 +265,17 @@ class PDController(Controller):
         ref = self.guidance(t, sc.attitude.x)
         e, _ = sc.attitude.state_error(ref[:-3], ref[-3:], sc.mean_motion)
 
+        if self.prev_e is None:
+            self.prev_e = e
+
+        e_int = 0.5 * self.sample_time * (e + self.prev_e)
+        self.prev_e = e
+
         # with quaternions it only takes the first 3 components
-        return self.control_law(e, sc.attitude.w if len(e) == 3
+        return self.control_law(e, e_int, sc.attitude.w if len(e) == 3
                                     else np.append(sc.attitude.w, 0))
 
-    def control_law(self, e: Union[float, np.ndarray],
+    def control_law(self, e: Union[float, np.ndarray], e_int: Union[float, np.ndarray],
                 e_dot: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
         """Compute the control variable given input error and its derivative.
 
@@ -271,7 +291,7 @@ class PDController(Controller):
         float | ndarray
             Control command.
         """
-        return -(e * self.kp + e_dot * self.kd)
+        return -(e * self.kp + e_int * self.ki + e_dot * self.kd)
 
 
 class NDIModelBased(Controller):

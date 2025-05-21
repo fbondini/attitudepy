@@ -170,7 +170,7 @@ class DynamicsSimulatorNoGravityTorque(ABCDynamicsSimulator):
 
         angdot = sc.attitude.kinematic_diff_equation(sc.mean_motion)
 
-        u = ctrl.full_control_command(dynamics_simulator, t)[:3] + sc.torque_disturb if ctrl is not None else np.zeros(3)  # noqa: E501
+        u = ctrl.full_control_command(dynamics_simulator, t)[:3] if ctrl is not None else np.zeros(3)  # noqa: E501
 
         return np.append(angdot, dynamics_simulator.fx + dynamics_simulator.gmatrix @ u)
 
@@ -265,6 +265,6 @@ class DynamicsSimulator(DynamicsSimulatorNoGravityTorque):
         sc = dynamics_simulator.spacecraft
         xdot = DynamicsSimulatorNoGravityTorque.dynamics_equation(x, t, dynamics_simulator)  # noqa: E501
         xdot[-3:] = xdot[-3:] + (np.linalg.inv(sc.inertia) @
-                sc.attitude.gravity_gradient_torque(sc.mean_motion, sc.inertia))
+                (sc.attitude.gravity_gradient_torque(sc.mean_motion, sc.inertia) + sc.torque_disturb))  # noqa: E501
 
         return xdot
