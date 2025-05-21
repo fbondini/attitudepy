@@ -7,12 +7,12 @@ from attitudepy import (
     Spacecraft,
     to_quat,
 )
-from attitudepy.controller import Controller
+from attitudepy.blocks import Block
 from attitudepy.dynamics import DynamicsSimulator
 from attitudepy.integration import ScipyIntegrator
 
 
-def initialise_euler(controller: Controller = None) -> DynamicsSimulator:
+def initialise_euler(controller: Block = None) -> DynamicsSimulator:
     """Initialise attitude and spacecraft with the assignment data."""  # noqa: DOC201
     tspan = [0, 1500]
     tstep = 0.1
@@ -39,7 +39,7 @@ def initialise_euler(controller: Controller = None) -> DynamicsSimulator:
     return DynamicsSimulator(spacecraft, integrator_settings, controller)
 
 
-def initialise_quat(controller: Controller = None) -> DynamicsSimulator:
+def initialise_quat(controller: Block = None) -> DynamicsSimulator:
     """Initialise attitude and spacecraft with the assignment data."""  # noqa: DOC201
     tspan = [0, 1500]
     tstep = 0.1

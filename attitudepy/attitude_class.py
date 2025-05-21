@@ -97,7 +97,7 @@ class Attitude(ABC):
         Returns
         -------
         e, e_dot: ndarray, ndarray
-            Error and error derivative to be passed to the Controller u function.
+            Error and error derivative to be passed to the Block u function.
             .
         """
         return
@@ -202,7 +202,7 @@ class AttitudeEuler(Attitude):
         Returns
         -------
         e, e_dot: ndarray, ndarray
-            Error and error derivative to be passed to the Controller u function.
+            Error and error derivative to be passed to the Block u function.
             .
         """
         e = self.ang - ref_ang
@@ -333,7 +333,7 @@ class AttitudeQuat(Attitude):
         Returns
         -------
         e, e_dot: ndarray, ndarray
-            Error and error derivative to be passed to the Controller u function.
+            Error and error derivative to be passed to the Block u function.
             .
         """
         current_ang = self.ang

@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
-from .controller import Controller
+from .blocks import Block
 from .integration import IntegratorSettings
 from .spacecraft_class import Spacecraft
 
@@ -13,7 +13,7 @@ class ABCDynamicsSimulator(ABC):
 
     def __init__(self, spacecraft: Spacecraft,
                     integrator_settings: IntegratorSettings,
-                    control: Controller = None) -> None:
+                    control: Block = None) -> None:
         """Initialise the dynamics simulator.
 
         Parameters
@@ -22,8 +22,8 @@ class ABCDynamicsSimulator(ABC):
             Spacecraft object
         integrator_settings: IntegratorSettings
             Object defining the integrator algorithm, time vector, and other settings
-        control: Controller (optional)
-            Controller object
+        control: Block (optional)
+            Block object
         """
         self.spacecraft = spacecraft
         self.control = control
@@ -124,7 +124,7 @@ class DynamicsSimulatorNoGravityTorque(ABCDynamicsSimulator):
 
     def __init__(self, spacecraft: Spacecraft,
                     integrator_settings: IntegratorSettings,
-                    control: Controller = None) -> None:
+                    control: Block = None) -> None:
         """Initialise the dynamics simulator.
 
         Parameters
@@ -133,8 +133,8 @@ class DynamicsSimulatorNoGravityTorque(ABCDynamicsSimulator):
             Spacecraft object
         integrator_settings: IntegratorSettings
             Object defining the integrator algorithm, time vector, and other settings
-        control: Controller (optional)
-            Controller object
+        control: Block (optional)
+            Block object
         """
         super().__init__(spacecraft, integrator_settings, control)
 
@@ -170,7 +170,7 @@ class DynamicsSimulatorNoGravityTorque(ABCDynamicsSimulator):
 
         angdot = sc.attitude.kinematic_diff_equation(sc.mean_motion)
 
-        u = ctrl.full_control_command(dynamics_simulator, t)[:3] if ctrl is not None else np.zeros(3)  # noqa: E501
+        u = ctrl.full_output(dynamics_simulator, t)[:3] if ctrl is not None else np.zeros(3)  # noqa: E501
 
         return np.append(angdot, dynamics_simulator.fx + dynamics_simulator.gmatrix @ u)
 
@@ -226,7 +226,7 @@ class DynamicsSimulator(DynamicsSimulatorNoGravityTorque):
 
     def __init__(self, spacecraft: Spacecraft,
                     integrator_settings: IntegratorSettings,
-                    control: Controller = None) -> None:
+                    control: Block = None) -> None:
         """Initialise the dynamics simulator.
 
         Parameters
@@ -235,8 +235,8 @@ class DynamicsSimulator(DynamicsSimulatorNoGravityTorque):
             Spacecraft object
         integrator_settings: IntegratorSettings
             Object defining the integrator algorithm, time vector, and other settings
-        control: Controller (optional)
-            Controller object
+        control: Block (optional)
+            Block object
         """
         super().__init__(spacecraft, integrator_settings, control)
 

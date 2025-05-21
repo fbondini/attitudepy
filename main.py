@@ -10,7 +10,8 @@ from attitudepy import (
     Spacecraft,
     to_quat_state,
 )
-from attitudepy.controller import (
+from attitudepy.blocks import (
+    ClassicNDIControlLoop,
     NDIModelBased,
     NDITimeScaleSeparation,
     PIDController,
@@ -31,7 +32,7 @@ from plotting_utils import (
 
 eul_no_control_no_gravity = False
 eul_no_control = False
-eul_classic_control = True
+eul_classic_control = False
 eul_model_ndi = True
 eul_timescale_ndi = False
 
@@ -59,7 +60,7 @@ classic_ki = np.array([0, 0, 0])
 classic_kd = np.array([70, 70, 2])
 
 # Gains for the NDI control loops (Euler angles)
-ndi_kp = np.array([1, 1, 1])
+ndi_kp = np.array([.5, .5, .3])
 ndi_ki = np.array([0, 0, 0])
 ndi_kd = np.array([2, 2, 2])
 
@@ -68,7 +69,7 @@ classic_kp_quat = np.array([10, 5, 0.5, 0])
 classic_ki_quat = np.array([0, 0, 0, 0])
 classic_kd_quat = np.array([50, 50, 1.19, 0])
 
-# Controller sample time
+# Block sample time
 tsample = 0.1
 
 
@@ -155,8 +156,10 @@ if eul_classic_control:
 if eul_model_ndi:
     ndi = NDIModelBased()
     controller = PIDController(ndi_kp, ndi_ki, ndi_kd, reference_commands,
-                                following=ndi, sample_time=tsample)
-    dynamics_simulator = initialise_euler(controller)
+                                sample_time=tsample)
+    control_loop = ClassicNDIControlLoop(controller, ndi)
+
+    dynamics_simulator = initialise_euler(control_loop)
 
     print("Running Euler angles, NDI control loop simulation")
     state_history = dynamics_simulator.simulate()
