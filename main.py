@@ -30,14 +30,14 @@ from plotting_utils import (
 
 eul_no_control_no_gravity = False
 eul_no_control = False
-eul_classic_control = True
+eul_classic_control = False
 eul_model_ndi = False
 eul_timescale_ndi = False
 
 quat_no_control_no_gravity = False
 quat_no_control = False
 quat_classic_control = True
-quat_model_ndi = False
+quat_model_ndi = True
 quat_timescale_ndi = False
 
 tspan = [0, 1500]
@@ -48,7 +48,7 @@ integrator_settings = ScipyIntegrator(t)
 classic_kp = [20, 20, 20]
 classic_kd = [120, 120, 120]
 
-classic_kp_quat = [60, 60, 60, 0]
+classic_kp_quat = [90, 90, 90, 0]
 classic_kd_quat = [120, 120, 120, 0]
 
 

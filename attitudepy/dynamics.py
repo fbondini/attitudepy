@@ -71,6 +71,7 @@ class ABCDynamicsSimulator(ABC):
         """
         return
 
+    @property
     @abstractmethod
     def fx(self) -> np.ndarray:
         """f(x) function.
@@ -85,6 +86,7 @@ class ABCDynamicsSimulator(ABC):
         """
         return
 
+    @property
     @abstractmethod
     def gmatrix(self) -> np.ndarray:
         """G(x) matrix.
@@ -100,6 +102,7 @@ class ABCDynamicsSimulator(ABC):
         """
         return
 
+    @property
     @abstractmethod
     def inv_gmatrix(self) -> np.ndarray:
         """G(x)^-1 matrix.
@@ -169,8 +172,9 @@ class DynamicsSimulatorNoGravityTorque(ABCDynamicsSimulator):
 
         u = ctrl.full_control_command(dynamics_simulator, t)[:3] + sc.torque_disturb if ctrl is not None else np.zeros(3)  # noqa: E501
 
-        return np.append(angdot, dynamics_simulator.fx() + dynamics_simulator.gmatrix() @ u)  # noqa: E501
+        return np.append(angdot, dynamics_simulator.fx + dynamics_simulator.gmatrix @ u)
 
+    @property
     def fx(self) -> np.ndarray:
         """f(x) function.
 
@@ -186,6 +190,7 @@ class DynamicsSimulatorNoGravityTorque(ABCDynamicsSimulator):
         return -np.linalg.inv(sc.inertia) @ np.cross(sc.attitude.w,
                                                         sc.inertia @ sc.attitude.w)
 
+    @property
     def gmatrix(self) -> np.ndarray:
         """G(x) matrix.
 
@@ -200,6 +205,7 @@ class DynamicsSimulatorNoGravityTorque(ABCDynamicsSimulator):
         """
         return np.linalg.inv(self.spacecraft.inertia)
 
+    @property
     def inv_gmatrix(self) -> np.ndarray:
         """G(x)^-1 matrix.
 

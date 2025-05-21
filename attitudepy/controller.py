@@ -252,7 +252,17 @@ class NDIModelBased(Controller):
             Control command.
         """
         ds = dynamics_simulator
-        return ds.inv_gmatrix() @ (previous_control_command[:3] - ds.fx())
+        sc = ds.spacecraft
+        anglen = len(sc.attitude.ang)
+        # return ds.inv_gmatrix() @ (previous_control_command[:3] - ds.fx())
+        m_matrix = sc.attitude.nwdx_matrix @ np.vstack([np.zeros([anglen, 3]),
+                                                        ds.gmatrix])
+
+        w = sc.attitude.w if anglen == 3 else np.append(sc.attitude.w, 0)
+        nw = sc.attitude.w2angdot_matrix() @ w
+        l_vector = sc.attitude.nwdx_matrix @ np.append(nw.T, ds.fx.T)
+
+        return np.linalg.inv(m_matrix[:3, :]) @ (previous_control_command[:3] - l_vector[:3])  # noqa: E501
 
 
 class NDITimeScaleSeparation(NDIModelBased):
@@ -297,12 +307,14 @@ class NDITimeScaleSeparation(NDIModelBased):
         previous_control_command: ndarray
             Control command computed by the previous block.
 
-        Returns
-        -------
-        ndarray
-            Control command.
+        # Returns
+        # -------
+        # ndarray
+        #     Control command.
         """
-        ds = dynamics_simulator
-        outer_loop_control = np.linalg.inv(ds.spacecraft.attitude.w2angdot_matrix()) \
-                                    @ previous_control_command
-        return super()._default_control_command(ds, t, outer_loop_control)
+        # ds = dynamics_simulator
+        # outer_loop_control = np.linalg.inv(ds.spacecraft.attitude.w2angdot_matrix()) \
+        #                             @ previous_control_command
+        # return super()._default_control_command(ds, t, outer_loop_control)
+        msg = "Not implemented yet"
+        raise NotImplementedError(msg)

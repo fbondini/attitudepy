@@ -139,6 +139,20 @@ class Attitude(ABC):
         """
         return
 
+    @property
+    @abstractmethod
+    def nwdx_matrix(self) -> np.ndarray:
+        """Compute the derivative with respect to the state of N*w.
+
+        Where N is w2angdot and w is the angular velocity.
+
+        Returns
+        -------
+        ndarray
+            Derivative with respect to the state of N*w.
+        """
+        return
+
 
 class AttitudeEuler(Attitude):
     """Attitude representation using Euler angles.
@@ -224,6 +238,26 @@ class AttitudeEuler(Attitude):
                             [np.cos(eul[1]), np.sin(eul[0]) * np.sin(eul[1]),  np.cos(eul[0]) * np.sin(eul[1])],  # noqa: E241, E501
                             [             0, np.cos(eul[0]) * np.cos(eul[1]), -np.sin(eul[0]) * np.cos(eul[1])],  # noqa: E201, E501
                             [             0,                  np.sin(eul[0]),                   np.cos(eul[0])]])  # noqa: E201, E241, E501
+
+    @property
+    def nwdx_matrix(self) -> np.ndarray:
+        """Compute the derivative with respect to the state of N*w.
+
+        Where N is w2angdot and w is the angular velocity.
+
+        Returns
+        -------
+        ndarray
+            Derivative with respect to the state of N*w.
+        """
+        theta1, theta2, _ = self.ang
+        _, w2, w3 = self.w
+        left_hand_side = 0.5 * np.array([
+            [(np.cos(theta1)*w2 - np.sin(theta1)*w3)*np.tan(theta2), (np.sin(theta1)*w2 + np.cos(theta1)*w3)/np.cos(theta2)**2, 0],  # noqa: E226, E501
+            [-np.sin(theta1)*w2 -np.cos(theta1)*w3, 0, 0],  # noqa: E226
+            [(np.cos(theta1)*w2 - np.sin(theta1)*w3)/np.cos(theta2), (np.sin(theta1)*w2 + np.cos(theta1)*w3)*np.tan(theta2)/np.cos(theta2), 0],  # noqa: E226, E501
+        ])
+        return np.column_stack([left_hand_side, self.w2angdot_matrix()])
 
     def to_quat(self) -> "AttitudeQuat":
         """Convert Euler angles to quaternion representation.
@@ -328,6 +362,25 @@ class AttitudeQuat(Attitude):
         """
         q = self.ang
         return 0.5 * self._q_rot_matrix(q).T
+
+    @property
+    def nwdx_matrix(self) -> np.ndarray:
+        """Compute the derivative with respect to the state of N*w.
+
+        Where N is w2angdot and w is the angular velocity.
+
+        Returns
+        -------
+        ndarray
+            Derivative with respect to the state of N*w.
+        """
+        left_hand_side = 0.5 * np.array([
+            [0, -self.w[2], self.w[1], -self.w[0]],
+            [self.w[2], 0, -self.w[0], -self.w[1]],
+            [-self.w[1], self.w[0], 0, -self.w[2]],
+            [self.w[0], self.w[1], self.w[2], 0],
+        ])
+        return np.column_stack([left_hand_side, self.w2angdot_matrix()[:, :3]])
 
     def to_euler(self) -> AttitudeEuler:
         """Convert quaternion to Euler angle representation.
