@@ -187,20 +187,11 @@ class PIDController(Block):
         custom_output: Callable
             Called insted of the default output method.
             It must have the same signatures as the control commands.
-
-        Raises
-        ------
-        ValueError
-            If ki is not 0 and sample time is negative.
         """
         super().__init__(guidance, following, sample_time, custom_output)
         self.kp = kp
         self.kd = kd
         self.ki = ki
-        if np.any(self.ki != 0) and self.sample_time < 0:
-            msg = ("Integral control is not supported for continuous control. "
-                            "Please set a sample time.")
-            raise ValueError(msg)
 
         self.prev_input = None
 
@@ -266,6 +257,7 @@ class PIDController(Block):
             self.prev_input = e
 
         else:
+            e = block_input
             e_dot = self.compute_edot(block_input, t - self.last_t)
             e_int = self.compute_eint(block_input, t - self.last_t)
             self.last_t = t
@@ -304,7 +296,7 @@ class PIDController(Block):
             e_dot = sc.attitude.w if len(e) == 3 else np.append(sc.attitude.w, 0)
 
         else:
-            e = block_input
+            e = -block_input
             e_dot = self.compute_edot(block_input, self.sample_time)
             e_int = self.compute_eint(block_input, self.sample_time)
 
@@ -421,16 +413,11 @@ class NDIModelBased(Block):
         return np.linalg.inv(m_matrix[:3, :]) @ (block_input[:3] - l_vector[:3])
 
 
-class NDITimeScaleSeparation(NDIModelBased):
-    """Nonlinear Dynamic Inversion - time-scale separation approach.
+class NDIOuterLoopBlock(NDIModelBased):
+    """Outer loop computations (after the PD) for the NDI timescale separation.
 
-    Requires a previous controller, since it takes its output as input
+    Requires a previous controller, since it takes its output as input.
 
-    Attributes
-    ----------
-    following: Block
-        Block to be placed after this block (the output of this block
-        is the input of the following block)
     """
 
     def __init__(self, following: Block = None,
@@ -450,7 +437,7 @@ class NDITimeScaleSeparation(NDIModelBased):
         """
         super().__init__(following, custom_output)
 
-    def _default_output(self,
+    def _default_output(self,  # noqa: PLR6301
                         dynamics_simulator: ABCDynamicsSimulator, t: float,
                         block_input: np.ndarray,
                         ) -> np.ndarray:
@@ -465,17 +452,61 @@ class NDITimeScaleSeparation(NDIModelBased):
         block_input: ndarray
             Control command computed by the previous block.
 
-        # Returns
-        # -------
-        # ndarray
-        #     Control command.
+        Returns
+        -------
+        ndarray
+            Angular rates to be passed to the inner loop.
         """
-        # ds = dynamics_simulator
-        # outer_loop_control = np.linalg.inv(ds.spacecraft.attitude.w2angdot_matrix()) \
-        #                             @ block_input
-        # return super()._default_output(ds, t, outer_loop_control)
-        msg = "Not implemented yet"
-        raise NotImplementedError(msg)
+        ds = dynamics_simulator
+        return (np.linalg.inv(ds.spacecraft.attitude.w2angdot_matrix()) @ block_input)[:3]  # noqa: E501
+
+
+class NDIInnerLoopBlock(NDIModelBased):
+    """Inner loop computations (after the PI) for the NDI timescale separation.
+
+    Requires a previous controller, since it takes its output as input.
+
+    """
+
+    def __init__(self, following: Block = None,
+                    custom_output: Optional[Callable] = None) -> None:
+        """Initialise the timescale separation NDI block.
+
+        The sample time is inherited from the previous controller.
+
+        Parameters
+        ----------
+        following: Block
+            Block to be placed after this block (the output of this block
+            is the input of the following block)
+        custom_output: Callable
+            Called insted of the default output method.
+            It must have the same signatures as the control commands.
+        """
+        super().__init__(following, custom_output)
+
+    def _default_output(self,  # noqa: PLR6301
+                        dynamics_simulator: ABCDynamicsSimulator, t: float,
+                        block_input: np.ndarray,
+                        ) -> np.ndarray:
+        """Set default output given the current state of dynamics simulator.
+
+        Parameters
+        ----------
+        dynamics_simulator: ABCDynamicsSimulator
+            Dynamic simulator object
+        t: float
+            Current time.
+        block_input: ndarray
+            Control command computed by the previous block.
+
+        Returns
+        -------
+        ndarray
+            Angular rates to be passed to the inner loop.
+        """
+        ds = dynamics_simulator
+        return ds.inv_gmatrix @ (block_input - ds.fx)[:3]
 
 
 class ControlLoop(Block):
@@ -605,3 +636,29 @@ class ClassicNDIControlLoop(ControlLoop):
             Model based NDI loop
         """
         super().__init__(controller, ndi_loop)
+
+
+class TimescaleSeparationNDI(ControlLoop):
+    """Defines the NDI control loop."""
+
+    def __init__(self, outer_controller: PIDController,
+                    outer_loop_block: NDIOuterLoopBlock,
+                    inner_controller: PIDController,
+                    inner_loop_block: NDIInnerLoopBlock) -> None:
+        """Initialise the NDI control loop.
+
+        Parameters
+        ----------
+        outer_controller: PIDController
+            Outer loop PID controller (usually a PD)
+        outer_loop_block: NDIOuterLoopBlock
+            Block objects that computes the outer loop operations
+        inner_controller: PIDController
+            Inner loop PID controller (usually a PI)
+        inner_loop_block: NDIInnerLoopBlock
+            Block objects that computes the inner loop operations
+        """
+        super().__init__(outer_controller,
+                            outer_loop_block,
+                            inner_controller,
+                            inner_loop_block)
