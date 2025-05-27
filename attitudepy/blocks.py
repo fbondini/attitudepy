@@ -108,10 +108,12 @@ class Block(ABC):  # noqa: D101
         """
         if self.sample_time < 0:
             if self.custom_output is not None:
-                return self.custom_output(dynamics_simulator, t,
+                cached_u = self.custom_output(dynamics_simulator, t,
                                                     block_input)
-            return self._default_output(dynamics_simulator, t,
+            else:
+                cached_u = self._default_output(dynamics_simulator, t,
                                                     block_input)
+            return cached_u
 
         if (t - self.last_activation_time) >= self.sample_time:
             self.last_activation_time = t
@@ -288,12 +290,15 @@ class PIDController(Block):
         if block_input is None:
             sc = dynamics_simulator.spacecraft
             ref = self.guidance(t, sc.attitude.x)
-            e, _ = sc.attitude.state_error(ref[:-3], ref[-3:], sc.mean_motion)
+            e, e_dot = sc.attitude.state_error(ref[:-3], ref[-3:], sc.mean_motion)
 
             e_int = self.compute_eint(e, self.sample_time)
             self.prev_input = e
 
-            e_dot = sc.attitude.w if len(e) == 3 else np.append(sc.attitude.w, 0)
+            if len(e) == 4:
+                e_dot = np.append(e_dot, 0)
+
+            # e_dot = sc.attitude.w if len(e) == 3 else np.append(sc.attitude.w, 0)
 
         else:
             e = -block_input
@@ -401,14 +406,14 @@ class NDIModelBased(Block):
         """
         ds = dynamics_simulator
         sc = ds.spacecraft
+        n = sc.mean_motion
         anglen = len(sc.attitude.ang)
-        # return ds.inv_gmatrix() @ (block_input[:3] - ds.fx())
-        m_matrix = sc.attitude.nwdx_matrix @ np.vstack([np.zeros([anglen, 3]),
+
+        m_matrix = sc.attitude.nwdx_matrix(n) @ np.vstack([np.zeros([anglen, 3]),
                                                         ds.gmatrix])
 
-        w = sc.attitude.w if anglen == 3 else np.append(sc.attitude.w, 0)
-        nw = sc.attitude.w2angdot_matrix() @ w
-        l_vector = sc.attitude.nwdx_matrix @ np.append(nw.T, ds.fx.T)
+        nw = sc.attitude.kinematic_diff_equation(n)
+        l_vector = sc.attitude.nwdx_matrix(n) @ np.append(nw, ds.fx)
 
         return np.linalg.inv(m_matrix[:3, :]) @ (block_input[:3] - l_vector[:3])
 
@@ -458,7 +463,12 @@ class NDIOuterLoopBlock(NDIModelBased):
             Angular rates to be passed to the inner loop.
         """
         ds = dynamics_simulator
-        return (np.linalg.inv(ds.spacecraft.attitude.w2angdot_matrix()) @ block_input)[:3]  # noqa: E501
+        c2 = ds.spacecraft.attitude.c_matrix()[:, 1]
+        b_vector = ds.spacecraft.attitude.w2angdot_matrix() @ c2
+
+        inv_m_matrix = np.linalg.inv(ds.spacecraft.attitude.w2angdot_matrix())
+        l_vector = ds.spacecraft.mean_motion * b_vector
+        return (inv_m_matrix @ (block_input - l_vector))[:3]
 
 
 class NDIInnerLoopBlock(NDIModelBased):
@@ -507,6 +517,54 @@ class NDIInnerLoopBlock(NDIModelBased):
         """
         ds = dynamics_simulator
         return ds.inv_gmatrix @ (block_input - ds.fx)[:3]
+
+
+class INDIActuatorLoopBlock(NDIModelBased):
+    """Inner loop computations (after the PI) for the NDI timescale separation.
+
+    Requires a previous controller, since it takes its output as input.
+
+    """
+
+    def __init__(self, following: Block = None,
+                    custom_output: Optional[Callable] = None) -> None:
+        """Initialise the timescale separation NDI block.
+
+        The sample time is inherited from the previous controller.
+
+        Parameters
+        ----------
+        following: Block
+            Block to be placed after this block (the output of this block
+            is the input of the following block)
+        custom_output: Callable
+            Called insted of the default output method.
+            It must have the same signatures as the control commands.
+        """
+        super().__init__(following, custom_output)
+
+    def _default_output(self,
+                        dynamics_simulator: ABCDynamicsSimulator, t: float,
+                        block_input: np.ndarray,
+                        ) -> np.ndarray:
+        """Set default output given the current state of dynamics simulator.
+
+        Parameters
+        ----------
+        dynamics_simulator: ABCDynamicsSimulator
+            Dynamic simulator object
+        t: float
+            Current time.
+        block_input: ndarray
+            Control command computed by the previous block.
+
+        Returns
+        -------
+        ndarray
+            Angular rates to be passed to the inner loop.
+        """
+        delta_u = block_input
+        return delta_u + self.cached_u if self.cached_u is not None else delta_u
 
 
 class ControlLoop(Block):
@@ -624,41 +682,53 @@ class ControlLoop(Block):
 class ClassicNDIControlLoop(ControlLoop):
     """Defines the NDI control loop."""
 
-    def __init__(self, controller: PIDController,
-                    ndi_loop: NDIModelBased) -> None:
+    def __init__(self, controller: PIDController) -> None:
         """Initialise the NDI control loop.
 
         Parameters
         ----------
         controller: PIDController
             Controller of the NDI loop
-        ndi_loop: NDIModelBased
-            Model based NDI loop
         """
-        super().__init__(controller, ndi_loop)
+        super().__init__(controller, NDIModelBased())
 
 
 class TimescaleSeparationNDI(ControlLoop):
-    """Defines the NDI control loop."""
+    """Defines the timescale separation NDI control loop."""
 
     def __init__(self, outer_controller: PIDController,
-                    outer_loop_block: NDIOuterLoopBlock,
-                    inner_controller: PIDController,
-                    inner_loop_block: NDIInnerLoopBlock) -> None:
+                    inner_controller: PIDController) -> None:
         """Initialise the NDI control loop.
 
         Parameters
         ----------
         outer_controller: PIDController
             Outer loop PID controller (usually a PD)
-        outer_loop_block: NDIOuterLoopBlock
-            Block objects that computes the outer loop operations
         inner_controller: PIDController
             Inner loop PID controller (usually a PI)
-        inner_loop_block: NDIInnerLoopBlock
-            Block objects that computes the inner loop operations
         """
         super().__init__(outer_controller,
-                            outer_loop_block,
+                            NDIOuterLoopBlock(),
                             inner_controller,
-                            inner_loop_block)
+                            NDIInnerLoopBlock())
+
+
+class INDIControlLoop(ControlLoop):
+    """Defines the timescale separation NDI control loop."""
+
+    def __init__(self, outer_controller: PIDController,
+                    inner_controller: PIDController) -> None:
+        """Initialise the NDI control loop.
+
+        Parameters
+        ----------
+        outer_controller: PIDController
+            Outer loop PID controller (usually a PD)
+        inner_controller: PIDController
+            Inner loop PID controller (usually a PI)
+        """
+        super().__init__(outer_controller,
+                            NDIOuterLoopBlock(),
+                            inner_controller,
+                            NDIInnerLoopBlock(),
+                            INDIActuatorLoopBlock())

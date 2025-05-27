@@ -139,17 +139,21 @@ class Attitude(ABC):
         """
         return
 
-    @property
     @abstractmethod
-    def nwdx_matrix(self) -> np.ndarray:
-        """Compute the derivative with respect to the state of N*w.
+    def nwdx_matrix(self, n: float) -> np.ndarray:
+        """Compute the derivative with respect to the state of (N*w + nb).
 
         Where N is w2angdot and w is the angular velocity.
+
+        Parameters
+        ----------
+        n: float
+            Orbit mean motion in rad/s
 
         Returns
         -------
         ndarray
-            Derivative with respect to the state of N*w.
+            Derivative with respect to the state of (N*w + nb).
         """
         return
 
@@ -239,23 +243,32 @@ class AttitudeEuler(Attitude):
                             [             0, np.cos(eul[0]) * np.cos(eul[1]), -np.sin(eul[0]) * np.cos(eul[1])],  # noqa: E201, E501
                             [             0,                  np.sin(eul[0]),                   np.cos(eul[0])]])  # noqa: E201, E241, E501
 
-    @property
-    def nwdx_matrix(self) -> np.ndarray:
-        """Compute the derivative with respect to the state of N*w.
+    def nwdx_matrix(self, n: float) -> np.ndarray:
+        """Compute the derivative with respect to the state of (N*w + nb).
 
         Where N is w2angdot and w is the angular velocity.
+
+        Parameters
+        ----------
+        n: float
+            Orbit mean motion in rad/s
 
         Returns
         -------
         ndarray
-            Derivative with respect to the state of N*w.
+            Derivative with respect to the state of (N*w + nb).
         """
-        theta1, theta2, _ = self.ang
+        theta1, theta2, theta3 = self.ang
         _, w2, w3 = self.w
-        left_hand_side = 0.5 * np.array([
+        left_hand_side = np.array([
             [(np.cos(theta1)*w2 - np.sin(theta1)*w3)*np.tan(theta2), (np.sin(theta1)*w2 + np.cos(theta1)*w3)/np.cos(theta2)**2, 0],  # noqa: E226, E501
             [-np.sin(theta1)*w2 -np.cos(theta1)*w3, 0, 0],  # noqa: E226
             [(np.cos(theta1)*w2 - np.sin(theta1)*w3)/np.cos(theta2), (np.sin(theta1)*w2 + np.cos(theta1)*w3)*np.tan(theta2)/np.cos(theta2), 0],  # noqa: E226, E501
+        ])
+        left_hand_side = left_hand_side + np.array([
+            [0, n * np.sin(theta3) * np.tan(theta2) / np.cos(theta2), n * np.cos(theta3) / np.cos(theta2)],  # noqa: E501
+            [0, 0, -n * np.sin(theta3)],
+            [0, n * np.sin(theta3) / np.cos(theta2)**2, n * np.tan(theta2) * np.cos(theta3)],  # noqa: E501
         ])
         return np.column_stack([left_hand_side, self.w2angdot_matrix()])
 
@@ -337,9 +350,9 @@ class AttitudeQuat(Attitude):
             .
         """
         current_ang = self.ang
-        current_w = self.w
         e = self._q_rot_matrix(ref_ang) @ current_ang
-        e_dot = current_w - ref_w
+        # e_dot = self.kinematic_diff_equation(n)
+        e_dot = self.w - ref_w
 
         return e, e_dot
 
@@ -363,16 +376,20 @@ class AttitudeQuat(Attitude):
         q = self.ang
         return 0.5 * self._q_rot_matrix(q).T
 
-    @property
-    def nwdx_matrix(self) -> np.ndarray:
-        """Compute the derivative with respect to the state of N*w.
+    def nwdx_matrix(self, n: float) -> np.ndarray:
+        """Compute the derivative with respect to the state of (N*w + nb).
 
         Where N is w2angdot and w is the angular velocity.
+
+        Parameters
+        ----------
+        n: float
+            Orbit mean motion in rad/s
 
         Returns
         -------
         ndarray
-            Derivative with respect to the state of N*w.
+            Derivative with respect to the state of (N*w + nb).
         """
         left_hand_side = 0.5 * np.array([
             [0, -self.w[2], self.w[1], -self.w[0]],
@@ -461,3 +478,26 @@ def to_euler_state(state: np.ndarray) -> np.ndarray:
         Equivalent state in Euler angles representation.
     """
     return np.append(to_euler(state[:4]), state[4:])
+
+
+def to_quat_reference(state: np.ndarray, n: float) -> np.ndarray:
+    """Convert Euler angles reference to quaternion reference.
+
+    Parameters
+    ----------
+    state: ndarray
+        [eul1, eul2, eul3, thetadot1, thetadot2, thetadot3] in rad and rad/s.
+        Where euli is the i-th component of the euler angle attitude
+        and wi the i-th component of the angular velocity.
+    n: float
+        Mean motion of the orbit.
+
+    Returns
+    -------
+    ndarray
+        Equivalent state in quaternion representation.
+    """
+    attitude = AttitudeQuat(to_quat(state[:3]))
+    attitude.w = state[3:]
+    qdot = attitude.kinematic_diff_equation(n)
+    return np.append(to_quat(state[:3]), qdot)

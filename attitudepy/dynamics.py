@@ -188,7 +188,7 @@ class DynamicsSimulatorNoGravityTorque(ABCDynamicsSimulator):
         """
         sc = self.spacecraft
         return -np.linalg.inv(sc.inertia) @ np.cross(sc.attitude.w,
-                                                        sc.inertia @ sc.attitude.w)
+                                    sc.inertia @ sc.attitude.w)
 
     @property
     def gmatrix(self) -> np.ndarray:
@@ -268,3 +268,22 @@ class DynamicsSimulator(DynamicsSimulatorNoGravityTorque):
                 (sc.attitude.gravity_gradient_torque(sc.mean_motion, sc.inertia) + sc.torque_disturb))  # noqa: E501
 
         return xdot
+
+    @property
+    def fx(self) -> np.ndarray:
+        """f(x) function.
+
+        It represents the part of the dynamics equations that do not depend on the
+        external moments.
+
+        Returns
+        -------
+        ndarray
+            Evaluation of f(x) at the current state.
+        """
+        sc = self.spacecraft
+        gravity_gradient = sc.attitude.gravity_gradient_torque(
+            sc.mean_motion, sc.inertia,
+        )
+        return -np.linalg.inv(sc.inertia) @ (np.cross(sc.attitude.w,
+                                sc.inertia @ sc.attitude.w) - gravity_gradient)

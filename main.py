@@ -12,9 +12,8 @@ from attitudepy import (
 )
 from attitudepy.blocks import (
     ClassicNDIControlLoop,
-    NDIInnerLoopBlock,
+    INDIControlLoop,
     NDIModelBased,
-    NDIOuterLoopBlock,
     PIDController,
     TimescaleSeparationNDI,
 )
@@ -36,16 +35,17 @@ eul_no_control_no_gravity = False
 eul_no_control = False
 eul_classic_control = False
 eul_model_ndi = False
-eul_timescale_ndi = True
+eul_timescale_ndi = False
+eul_indi = False
 
 quat_no_control_no_gravity = False
 quat_no_control = False
 quat_classic_control = False
 quat_model_ndi = False
-quat_timescale_ndi = False
+quat_timescale_ndi = True
 
 tspan = [0, 1500]
-tstep = 0.01
+tstep = 0.1
 t = np.arange(tspan[0], tspan[1] + tstep, tstep)
 integrator_settings = ScipyIntegrator(t)
 
@@ -57,28 +57,28 @@ integrator_settings = ScipyIntegrator(t)
 # system, might be slightly different for the continous one.
 
 # Gains for the classic control loop (Euler angles)
-classic_kp = np.array([10, 5, 0.5])
+classic_kp = np.array([5.5, 5.5, 3.5])
 classic_ki = np.array([0, 0, 0])
-classic_kd = np.array([70, 70, 2])
+classic_kd = np.array([37, 37, 6])
 
 # Gains for the NDI control loops (Euler angles)
-ndi_kp = np.array([.5, .5, .3])
+ndi_kp = np.array([10, 10, 5])
 ndi_ki = np.array([0, 0, 0])
-ndi_kd = np.array([2, 2, 2])
+ndi_kd = np.array([10, 10, 5])
 
 # Gains for the NDI time scale separation control loop (Euler angles)
-out_kp = np.array([.3, .3, .3])
+out_kp = np.array([3, 3, 3])
 out_ki = np.array([0, 0, 0])
-out_kd = np.array([2, 2, 2])
+out_kd = np.array([3, 3, 3])
 
-inn_kp = np.array([2, 2, 2])
-inn_ki = np.array([.5, .5, .5])
+inn_kp = np.array([3, 3, 3])
+inn_ki = np.array([0, 0, 0])
 inn_kd = np.array([0, 0, 0])
 
 # Gains for the classic control loop (quaternions angles)
 classic_kp_quat = np.array([10, 5, 0.5, 0])
 classic_ki_quat = np.array([0, 0, 0, 0])
-classic_kd_quat = np.array([50, 50, 1.19, 0])
+classic_kd_quat = np.array([30, 30, 1, 0])
 
 # Block sample time
 tsample = 0.1
@@ -117,7 +117,7 @@ if eul_no_control_no_gravity:
             [      0,       0, 0.704],  # noqa: E201, E241
         ]),
         torque_disturb=np.array([
-            0.001, 0.001, 0.001,  # Nm
+            0.0001, 0.0001, 0.0001,  # Nm
         ]),
     )
 
@@ -165,10 +165,9 @@ if eul_classic_control:
 
 
 if eul_model_ndi:
-    ndi = NDIModelBased()
     controller = PIDController(ndi_kp, ndi_ki, ndi_kd, reference_commands,
                                 sample_time=tsample)
-    control_loop = ClassicNDIControlLoop(controller, ndi)
+    control_loop = ClassicNDIControlLoop(controller)
 
     dynamics_simulator = initialise_euler(control_loop)
 
@@ -183,12 +182,9 @@ if eul_model_ndi:
 
 
 if eul_timescale_ndi:
-
     control_loop = TimescaleSeparationNDI(
         PIDController(out_kp, out_ki, out_kd, reference_commands, sample_time=tsample),
-        NDIOuterLoopBlock(),
         PIDController(inn_kp, inn_ki, inn_kd, reference_commands, sample_time=tsample),
-        NDIInnerLoopBlock(),
     )
 
     dynamics_simulator = initialise_euler(control_loop)
@@ -200,6 +196,25 @@ if eul_timescale_ndi:
 
     plot_eul_separate(time, state, ["$\\theta_1$", "$\\theta_2$", "$\\theta_3$"],
                 ["Time (s)", "Angles (deg)"], "Time Scale Sep. NDI controlled attitude - E",  # noqa: E501
+                reference_commands)
+
+
+if eul_indi:
+
+    control_loop = INDIControlLoop(
+        PIDController(out_kp, out_ki, out_kd, reference_commands, sample_time=tsample),
+        PIDController(inn_kp, inn_ki, inn_kd, reference_commands, sample_time=tsample),
+    )
+
+    dynamics_simulator = initialise_euler(control_loop)
+
+    print("Running Euler angles, incremental NDI control loop simulation")
+    state_history = dynamics_simulator.simulate()
+    time = np.array(list(state_history.keys()))
+    state = np.vstack(list(state_history.values()))
+
+    plot_eul_separate(time, state, ["$\\theta_1$", "$\\theta_2$", "$\\theta_3$"],
+                ["Time (s)", "Angles (deg)"], "Incremental NDI controlled attitude - E",
                 reference_commands)
 
 
@@ -267,10 +282,11 @@ if quat_classic_control:
 
 
 if quat_model_ndi:
-    ndi = NDIModelBased()
-    controller = PIDController(classic_kp_quat, classic_ki_quat, classic_kd_quat,
-                                reference_commands_quat,
-                                following=ndi, sample_time=tsample)
+    ndi_kp, ndi_ki, nd_kd = np.append(ndi_kp, 0), np.append(ndi_ki, 0), np.append(ndi_kd, 0)  # noqa: E501
+    controller = PIDController(ndi_kp, ndi_ki, ndi_kd, reference_commands,
+                                sample_time=tsample)
+    control_loop = ClassicNDIControlLoop(controller)
+
     dynamics_simulator = initialise_quat(controller)
 
     state_history = dynamics_simulator.simulate()
@@ -282,20 +298,21 @@ if quat_model_ndi:
                 reference_commands)
 
 
-# if quat_timescale_ndi:
-#     ndi = NDITimeScaleSeparation()
-#     controller = PIDController(classic_kp_quat, classic_ki_quat, classic_kd_quat,
-#                                 reference_commands_quat,
-#                                 following=ndi, sample_time=tsample)
-#     dynamics_simulator = initialise_quat(controller)
+if quat_timescale_ndi:
+    control_loop = TimescaleSeparationNDI(
+        PIDController(out_kp, out_ki, out_kd, reference_commands, sample_time=tsample),
+        PIDController(inn_kp, inn_ki, inn_kd, reference_commands, sample_time=tsample),
+    )
 
-#     state_history = dynamics_simulator.simulate()
-#     time = np.array(list(state_history.keys()))
-#     state = np.vstack(list(state_history.values()))
+    dynamics_simulator = initialise_quat(controller)
 
-#     plot_quat_separate(time, state, ["$\\theta_1$", "$\\theta_2$", "$\\theta_3$"],
-#                 ["Time (s)", "Angles (deg)"], "Time Scale Sep. NDI controlled attitude - Q",  # noqa: E501
-#                 reference_commands)
+    state_history = dynamics_simulator.simulate()
+    time = np.array(list(state_history.keys()))
+    state = np.vstack(list(state_history.values()))
+
+    plot_quat_separate(time, state, ["$\\theta_1$", "$\\theta_2$", "$\\theta_3$"],
+                ["Time (s)", "Angles (deg)"], "Time Scale Sep. NDI controlled attitude - Q",  # noqa: E501
+                reference_commands)
 
 
 if np.any([
@@ -304,6 +321,7 @@ if np.any([
         eul_classic_control,
         eul_model_ndi,
         eul_timescale_ndi,
+        eul_indi,
         quat_no_control_no_gravity,
         quat_no_control,
         quat_classic_control,
