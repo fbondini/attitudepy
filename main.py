@@ -40,9 +40,9 @@ eul_indi = False
 
 quat_no_control_no_gravity = False
 quat_no_control = False
-quat_classic_control = False
+quat_classic_control = True
 quat_model_ndi = False
-quat_timescale_ndi = True
+quat_timescale_ndi = False
 
 tspan = [0, 1500]
 tstep = 0.1
@@ -76,9 +76,9 @@ inn_ki = np.array([0, 0, 0])
 inn_kd = np.array([0, 0, 0])
 
 # Gains for the classic control loop (quaternions angles)
-classic_kp_quat = np.array([10, 5, 0.5, 0])
+classic_kp_quat = np.array([15, 15, 15, 0])
 classic_ki_quat = np.array([0, 0, 0, 0])
-classic_kd_quat = np.array([30, 30, 1, 0])
+classic_kd_quat = np.array([37, 37, 6, 0])
 
 # Block sample time
 tsample = 0.1

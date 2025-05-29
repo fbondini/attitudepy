@@ -14,7 +14,7 @@ from attitudepy.integration import ScipyIntegrator
 
 def initialise_euler(controller: Block = None) -> DynamicsSimulator:
     """Initialise attitude and spacecraft with the assignment data."""  # noqa: DOC201
-    tspan = [0, 400]
+    tspan = [0, 1500]
     tstep = 0.1
     t = np.arange(tspan[0], tspan[1] + tstep, tstep)
     integrator_settings = ScipyIntegrator(t)

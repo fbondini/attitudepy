@@ -295,8 +295,8 @@ class PIDController(Block):
             e_int = self.compute_eint(e, self.sample_time)
             self.prev_input = e
 
-            if len(e) == 4:
-                e_dot = np.append(e_dot, 0)
+            # if len(e) == 4:
+            #     e_dot = self.compute_edot(e, self.sample_time)
 
             # e_dot = sc.attitude.w if len(e) == 3 else np.append(sc.attitude.w, 0)
 

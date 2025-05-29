@@ -352,7 +352,7 @@ class AttitudeQuat(Attitude):
         current_ang = self.ang
         e = self._q_rot_matrix(ref_ang) @ current_ang
         # e_dot = self.kinematic_diff_equation(n)
-        e_dot = self.w - ref_w
+        e_dot = np.append(self.w - ref_w, 0)
 
         return e, e_dot
 
