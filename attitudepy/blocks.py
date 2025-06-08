@@ -411,12 +411,18 @@ class NDIModelBased(Block):
 
         m_matrix = sc.attitude.nwdx_matrix(n) @ np.vstack([np.zeros([anglen, 3]),
                                                         ds.gmatrix])
+        
+        # if anglen == 3:
+        #     m_inv = np.linalg.inv(m_matrix)
+        # else:
+        #     m_inv = np.linalg.pinv(m_matrix)
+        m_inv = np.linalg.inv(m_matrix)
 
         nw = sc.attitude.kinematic_diff_equation(n)
         l_vector = sc.attitude.nwdx_matrix(n) @ np.append(nw, ds.fx)
 
-        return np.linalg.inv(m_matrix[:3, :]) @ (block_input[:3] - l_vector[:3])
-
+        return m_inv @ (block_input[:3] - l_vector[:3])
+        # return m_inv @ (block_input - l_vector)
 
 class NDIOuterLoopBlock(NDIModelBased):
     """Outer loop computations (after the PD) for the NDI timescale separation.
@@ -464,11 +470,14 @@ class NDIOuterLoopBlock(NDIModelBased):
         """
         ds = dynamics_simulator
         c2 = ds.spacecraft.attitude.c_matrix()[:, 1]
-        b_vector = ds.spacecraft.attitude.w2angdot_matrix() @ c2
+        b_vector = ds.spacecraft.attitude.w2angdot_matrix()[:3, :3] @ c2
 
-        inv_m_matrix = np.linalg.inv(ds.spacecraft.attitude.w2angdot_matrix())
+        m_matrix = ds.spacecraft.attitude.w2angdot_matrix()
+        m_matrix = m_matrix[:3, :3]
+
+        inv_m_matrix = np.linalg.inv(m_matrix)
         l_vector = ds.spacecraft.mean_motion * b_vector
-        return (inv_m_matrix @ (block_input - l_vector))[:3]
+        return (inv_m_matrix @ (block_input[:3] - l_vector))
 
 
 class NDIInnerLoopBlock(NDIModelBased):

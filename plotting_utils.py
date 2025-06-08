@@ -37,7 +37,7 @@ def plot_eul_separate(t: np.ndarray, y: np.ndarray, labels: List[str],
     """Plot each Euler angle and its reference on separate subplots in one row."""
     style.use("default.mplstyle")
 
-    fig, axs = plt.subplots(1, 3, figsize=(15, 4), sharex=True)
+    fig, axs = plt.subplots(3, 1, figsize=(4, 8), sharex=True)
 
     if ref_function is not None:
         reference = ref_function(t[0], y[0])
@@ -53,14 +53,15 @@ def plot_eul_separate(t: np.ndarray, y: np.ndarray, labels: List[str],
 
         axs[i].grid(True)  # noqa: FBT003
         axs[i].set_xlabel(axislabels[0])
-        axs[i].set_ylabel(axislabels[1])
+        axs[i].set_ylabel(labels[i])
         axs[i].legend(loc="best")
-        axs[i].set_title(f"{labels[i]} vs Time")
+        # axs[i].set_title(f"{labels[i]} vs Time")
 
     if title is not None:
         fig.suptitle(title)
 
     plt.tight_layout()
+    fig.subplots_adjust(hspace=0.3)
 
 
 def plot_w(t: np.ndarray, w: np.ndarray, labels: List,
@@ -90,7 +91,7 @@ def plot_w_separate(t: np.ndarray, y: np.ndarray, labels: List[str],
     """Plot each Euler angle and its reference on separate subplots in one row."""
     style.use("default.mplstyle")
 
-    fig, axs = plt.subplots(1, 3, figsize=(15, 4), sharex=True)
+    fig, axs = plt.subplots(3, 1, figsize=(4, 8), sharex=True)
 
     for i in range(3):
         angle_deg = y[:, 3 + from_quat + i] * 180 / np.pi
@@ -100,12 +101,13 @@ def plot_w_separate(t: np.ndarray, y: np.ndarray, labels: List[str],
         axs[i].set_xlabel(axislabels[0])
         axs[i].set_ylabel(axislabels[1])
         axs[i].legend(loc="best")
-        axs[i].set_title(f"{labels[i]} vs Time")
+        # axs[i].set_title(f"{labels[i]} vs Time")
 
     if title is not None:
         fig.suptitle(title)
 
     plt.tight_layout()
+    fig.subplots_adjust(hspace=0.3)
 
 
 def plot_quat(t: np.ndarray, q: np.ndarray, labels: List,
@@ -139,7 +141,7 @@ def plot_quat_separate(t: np.ndarray, q: np.ndarray, labels: List[str],
     """Plot quaternions state as eul angles and its reference on subplots in one row."""
     style.use("default.mplstyle")
 
-    fig, axs = plt.subplots(1, 3, figsize=(15, 4), sharex=True)
+    fig, axs = plt.subplots(3, 1, figsize=(4, 8), sharex=True)
 
     if ref_function is not None:
         reference = ref_function(t[0], q[0, :4])
@@ -160,11 +162,12 @@ def plot_quat_separate(t: np.ndarray, q: np.ndarray, labels: List[str],
 
         axs[i].grid(True)  # noqa: FBT003
         axs[i].set_xlabel(axislabels[0])
-        axs[i].set_ylabel(axislabels[1])
+        axs[i].set_ylabel(labels[i])
         axs[i].legend(loc="best")
-        axs[i].set_title(f"{labels[i]} vs Time")
+        # axs[i].set_title(f"{labels[i]} vs Time")
 
     if title is not None:
         fig.suptitle(title)
 
     plt.tight_layout()
+    fig.subplots_adjust(hspace=0.3)

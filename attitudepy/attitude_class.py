@@ -391,13 +391,53 @@ class AttitudeQuat(Attitude):
         ndarray
             Derivative with respect to the state of (N*w + nb).
         """
-        left_hand_side = 0.5 * np.array([
-            [0, -self.w[2], self.w[1], -self.w[0]],
-            [self.w[2], 0, -self.w[0], -self.w[1]],
-            [-self.w[1], self.w[0], 0, -self.w[2]],
-            [self.w[0], self.w[1], self.w[2], 0],
+        q1, q2, q3, q4 = self.ang
+        w1, w2, w3 = self.w
+
+        # left = 0.5 * np.array([
+        #     [ -(q1/q4)*w1 + (q1/q3)*w2 - (q1/q2)*w3 - n*q1/q3,
+        #     -(q2/q4)*w1 + (q2/q3)*w2 + (q2/q2)*w3 - n*q2/q3,
+        #     -(q3/q4)*w1 - (q2/q2)*w2 - (q3/q2)*w3 + n,
+        #     (q4/q4)*w1 + (q4/q3)*w2 - (q4/q2)*w3 - n*q4/q3],
+
+        #     [ -(q1/q3)/w1 - (q1/q4)*w2 - w3 - n*(q1/q4),
+        #     -q2/q3*w1 - q2/q4*w2 + q2/q1*w3 - n*q2/q4,
+        #     w1 - q3/q4*w2 + q3/q1*w3 - n*q3/q4 ,
+        #     -q4/q3*w1 + w2 + q4/q1*w3 + n],
+
+        #     [q1/q2*w1 + w2 -q1/q4*w3 - n,
+        #     -w1 - q2/q1*w2 - q2/q4*w3 + n*q2/q1,
+        #     q3/q2*w1 - q3/q1*w2 - q3/q4*w3 + n*q3/q1,
+        #     q4/q2*w1 - q4/q1*w2 + w3 + n*q4/q1],
+
+        #     # [-w1 + q1/q2*w2 + q1/q3*w3 + n*q1/q2,
+        #     # +q2/q1*w1 - w2 + q2/q3*w3 - n,
+        #     # q3/q1*w1 + q3/q2*w2 - w3 + n*q3/q2,
+        #     # q4/q1*w1 + q4/q2*w2 + q4/q3*w3 + n*q4/q2]
+        # ])
+
+        # right = 0.5 * np.array([
+        #     [q4, -q3, q2],
+        #     [q3, q4, -q1],
+        #     [-q2, q1, q4],
+        #     # [-q1, -q2, -q3],
+        # ])
+
+        left = 0.5 * np.array([
+            [0, w3, (n-w2), w1],
+            [-w3, 0, w1, (w2+n)],
+            [(w2-n), -w1, 0, w3],
+            # [-w1, -(w2+n), -w3, 0],
         ])
-        return np.column_stack([left_hand_side, self.w2angdot_matrix()[:, :3]])
+
+        right = 0.5 * np.array([
+            [q4, -q3, q2],
+            [q3, q4, -q1],
+            [-q2, q1, q4],
+            # [-q1, -q2, -q3],
+        ])
+
+        return np.column_stack([left, right])
 
     def to_euler(self) -> AttitudeEuler:
         """Convert quaternion to Euler angle representation.
